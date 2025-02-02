@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { sendAnnouncementEmail } from '../utils/emailService';
 
 const AdminDashboard = () => {
     const [email, setEmail] = useState('');
@@ -97,6 +98,21 @@ const AdminDashboard = () => {
                 createdAt: serverTimestamp(),
                 read: {}
             };
+
+            
+            // Add announcement to Firestore
+            const docRef = await addDoc(collection(db, 'announcements'), announcementData);
+
+            // Get all user emails
+            const userEmails = users.map(user => user.email);
+
+            // Send email notification
+            await sendAnnouncementEmail(newAnnouncement, userEmails);
+
+            setSuccess('Announcement posted and notifications sent successfully!');
+            setNewAnnouncement('');
+            fetchAnnouncements();
+       
 
             await addDoc(collection(db, 'announcements'), announcementData);
             setSuccess('Announcement posted successfully!');
