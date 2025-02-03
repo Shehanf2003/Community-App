@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, doc, setDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { sendAnnouncementEmail } from '../utils/emailService';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Trash2 } from "lucide-react";
 
 const AdminDashboard = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [role, setRole] = useState('user');
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
     const [newAnnouncement, setNewAnnouncement] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
 
     const { currentUser } = useAuth();
     const auth = getAuth();
@@ -60,17 +72,13 @@ const AdminDashboard = () => {
         setLoading(true);
 
         try {
-            const userCredential = await createUserWithEmailAndPassword(
-                auth,
-                email,
-                password
-            );
-
+            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 email,
                 role,
                 createdBy: currentUser.uid,
-                createdAt: new Date().toISOString()
+                createdAt: serverTimestamp()
             });
 
             setSuccess('User registered successfully!');
@@ -80,9 +88,9 @@ const AdminDashboard = () => {
             fetchUsers();
         } catch (err) {
             setError('Failed to register user: ' + err.message);
+        } finally {
+            setLoading(false);
         }
-
-        setLoading(false);
     };
 
     const handleAnnouncementSubmit = async (e) => {
@@ -99,30 +107,36 @@ const AdminDashboard = () => {
                 read: {}
             };
 
+            await addDoc(collection(db, 'announcements'), announcementData);
             
-            // Add announcement to Firestore
-            const docRef = await addDoc(collection(db, 'announcements'), announcementData);
-
-            // Get all user emails
+            // Send email notifications
             const userEmails = users.map(user => user.email);
-
-            // Send email notification
             await sendAnnouncementEmail(newAnnouncement, userEmails);
 
             setSuccess('Announcement posted and notifications sent successfully!');
             setNewAnnouncement('');
             fetchAnnouncements();
-       
-
-            await addDoc(collection(db, 'announcements'), announcementData);
-            setSuccess('Announcement posted successfully!');
-            setNewAnnouncement('');
-            fetchAnnouncements();
         } catch (err) {
             setError('Failed to post announcement: ' + err.message);
+        } finally {
+            setIsSubmitting(false);
         }
+    };
 
-        setIsSubmitting(false);
+    const handleDeleteUser = async (user) => {
+        try {
+            setError('');
+            setSuccess('');
+            setLoading(true);
+
+            await deleteDoc(doc(db, 'users', user.id));
+            setSuccess('User deleted successfully!');
+            fetchUsers();
+        } catch (err) {
+            setError('Failed to delete user: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -131,25 +145,24 @@ const AdminDashboard = () => {
                 <div className="bg-white shadow rounded-lg p-6">
                     <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
 
+                    {/* Error and Success Messages */}
                     {error && (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
                             {error}
                         </div>
                     )}
-
                     {success && (
                         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
                             {success}
                         </div>
                     )}
 
+                    {/* User Registration Form */}
                     <div className="bg-gray-50 p-6 rounded-lg mb-6">
                         <h3 className="text-xl font-semibold mb-4">Register New User</h3>
                         <form onSubmit={handleRegisterUser} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Email
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
                                 <input
                                     type="email"
                                     required
@@ -158,11 +171,8 @@ const AdminDashboard = () => {
                                     onChange={(e) => setEmail(e.target.value)}
                                 />
                             </div>
-
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Password
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700">Password</label>
                                 <input
                                     type="password"
                                     required
@@ -171,11 +181,8 @@ const AdminDashboard = () => {
                                     onChange={(e) => setPassword(e.target.value)}
                                 />
                             </div>
-
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Role
-                                </label>
+                                <label className="block text-sm font-medium text-gray-700">Role</label>
                                 <select
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
                                     value={role}
@@ -185,7 +192,6 @@ const AdminDashboard = () => {
                                     <option value="admin">Admin</option>
                                 </select>
                             </div>
-
                             <button
                                 type="submit"
                                 disabled={loading}
@@ -196,7 +202,8 @@ const AdminDashboard = () => {
                         </form>
                     </div>
 
-                    <div className="bg-white shadow rounded-lg p-6 mt-6">
+                    {/* Announcement Form */}
+                    <div className="bg-white shadow rounded-lg p-6">
                         <h3 className="text-xl font-semibold mb-4">Post Announcement</h3>
                         <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
                             <div>
@@ -222,42 +229,76 @@ const AdminDashboard = () => {
                         </form>
                     </div>
 
+                    {/* Users Table */}
                     <div className="mt-6">
                         <h3 className="text-xl font-semibold mb-4">Registered Users</h3>
                         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Email
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Role
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Created At
-                                    </th>
-                                </tr>
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Email
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Role
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Created At
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                {users.map((user) => (
-                                    <tr key={user.id}>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {user.email}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {user.role}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            {new Date(user.createdAt).toLocaleDateString()}
-                                        </td>
-                                    </tr>
-                                ))}
+                                    {users.map((user) => (
+                                        <tr key={user.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {user.email}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {user.role}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {new Date(user.createdAt?.toDate()).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <button 
+                                                            className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                                            disabled={loading || user.id === currentUser.uid}
+                                                        >
+                                                            <Trash2 className="h-5 w-5" />
+                                                        </button>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Delete User</AlertDialogTitle>
+                                                            <AlertDialogDescription>
+                                                                Are you sure you want to delete {user.email}? This action cannot be undone.
+                                                            </AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                            <AlertDialogAction 
+                                                                onClick={() => handleDeleteUser(user)}
+                                                                className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+                                                            >
+                                                                Delete
+                                                            </AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
                     </div>
 
+                    {/* Announcements List */}
                     <div className="mt-6">
                         <h3 className="text-xl font-semibold mb-4">Recent Announcements</h3>
                         <div className="space-y-4">
@@ -277,4 +318,4 @@ const AdminDashboard = () => {
     );
 };
 
-export default AdminDashboard;
+export default AdminDashboard;
