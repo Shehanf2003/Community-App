@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { sendAnnouncementEmail } from '../utils/emailService';
 import { Trash2 } from "lucide-react";
 
 const AdminDashboard = () => {
