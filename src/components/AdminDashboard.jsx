@@ -113,23 +113,26 @@ const AdminDashboard = () => {
         setIsSubmitting(true);
         setError('');
         setSuccess('');
-
+    
         try {
-            const announcementData = {
+            // Create announcement in Firebase
+            const announcementRef = await addDoc(collection(db, 'announcements'), {
                 content: newAnnouncement,
                 createdBy: currentUser.uid,
                 createdAt: serverTimestamp(),
                 read: {}
-            };
-
-            await addDoc(collection(db, 'announcements'), announcementData);
+            });
+    
+            // Send emails to all users
+            const emailResults = await sendAnnouncementEmail(newAnnouncement);
             
-            const userEmails = users.map(user => user.email);
-            await sendAnnouncementEmail(newAnnouncement, userEmails);
-
-            setSuccess('Announcement posted and notifications sent successfully!');
+            // Track email delivery status
+            await trackAnnouncementDelivery(announcementRef.id, emailResults);
+    
+            setSuccess('Announcement posted and sent to ${emailResults.totalSent} users successfully!');
             setNewAnnouncement('');
             fetchAnnouncements();
+            
         } catch (err) {
             setError('Failed to post announcement: ' + err.message);
         } finally {
