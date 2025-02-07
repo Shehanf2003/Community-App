@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, EmailAuthProvider,reauthenticateWithCredential,signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Trash2 } from "lucide-react";
@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 const AdminDashboard = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [username, setUsername] = useState('');
     const [role, setRole] = useState('user');
     const [users, setUsers] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
@@ -15,6 +16,9 @@ const AdminDashboard = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [deleteUserPassword, setDeleteUserPassword] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
 
     const { currentUser } = useAuth();
     const auth = getAuth();
@@ -59,7 +63,25 @@ const AdminDashboard = () => {
         setSuccess('');
         setLoading(true);
 
+        if (!username.trim()) {
+            setError('Username is required');
+            setLoading(false);
+            return;
+        }
+
         try {
+            // Check if username already exists
+            const usersSnapshot = await getDocs(collection(db, 'users'));
+            const usernameExists = usersSnapshot.docs.some(
+                doc => doc.data().username?.toLowerCase() === username.toLowerCase()
+            );
+
+            if (usernameExists) {
+                setError('Username already exists');
+                setLoading(false);
+                return;
+            }
+
             const userCredential = await createUserWithEmailAndPassword(
                 auth,
                 email,
@@ -68,6 +90,7 @@ const AdminDashboard = () => {
 
             await setDoc(doc(db, 'users', userCredential.user.uid), {
                 email,
+                username,
                 role,
                 createdBy: currentUser.uid,
                 createdAt: new Date().toISOString()
@@ -76,6 +99,7 @@ const AdminDashboard = () => {
             setSuccess('User registered successfully!');
             setEmail('');
             setPassword('');
+            setUsername('');
             setRole('user');
             fetchUsers();
         } catch (err) {
@@ -85,21 +109,68 @@ const AdminDashboard = () => {
         }
     };
 
-    const handleDeleteUser = async (user) => {
-        try {
-            setError('');
-            setSuccess('');
-            setLoading(true);
-            
-            // Prevent deleting the current user
-            if (user.id === currentUser.uid) {
-                setError('Cannot delete the current user');
-                return;
-            }
 
-            await deleteDoc(doc(db, 'users', user.id));
-            setSuccess('User deleted successfully!');
-            fetchUsers();
+    const initiateDeleteUser = (user) => {
+        if (user.id === currentUser.uid) {
+            setError('Cannot delete the current user');
+            return;
+        }
+        setUserToDelete(user);
+        setShowDeleteConfirm(true);
+        setError('');
+        setSuccess('');
+    };
+
+    const handleDeleteUser = async () => {
+        if (!userToDelete || !deleteUserPassword) {
+            setError('Password is required to delete user');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            setError('');
+
+            // First, reauthenticate the current admin user
+            const credential = EmailAuthProvider.credential(
+                currentUser.email,
+                deleteUserPassword
+            );
+            await reauthenticateWithCredential(currentUser, credential);
+
+            // Delete from Firestore first
+            await deleteDoc(doc(db, 'users', userToDelete.id));
+
+            // Create a new Auth instance for the user to be deleted
+            const secondaryAuth = getAuth();
+            
+            try {
+                // Sign out the current admin temporarily
+                await auth.signOut();
+
+                // Sign in as the user to be deleted
+                const userCredential = await signInWithEmailAndPassword(
+                    secondaryAuth,
+                    userToDelete.email,
+                    userToDelete.initialPassword // This would need to be stored when creating the user
+                );
+
+                // Delete the user from Authentication
+                await deleteUser(userCredential.user);
+
+                // Sign back in as admin
+                await signInWithEmailAndPassword(auth, currentUser.email, deleteUserPassword);
+
+                setSuccess('User deleted successfully from both Authentication and Firestore!');
+                setShowDeleteConfirm(false);
+                setDeleteUserPassword('');
+                setUserToDelete(null);
+                fetchUsers();
+            } catch (authError) {
+                // If we can't delete the Authentication user, restore Firestore document
+                await setDoc(doc(db, 'users', userToDelete.id), userToDelete);
+                setError('Failed to delete user from Authentication. The user may need to be deleted manually from the Firebase Console.');
+            }
         } catch (err) {
             setError('Failed to delete user: ' + err.message);
         } finally {
@@ -172,6 +243,19 @@ const AdminDashboard = () => {
 
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
+                                    Username
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
                                     Password
                                 </label>
                                 <input
@@ -215,12 +299,13 @@ const AdminDashboard = () => {
                                 className="flex justify-between items-center bg-gray-50 p-4 rounded-lg mb-2"
                             >
                                 <div>
-                                    <span className="font-medium">{user.email}</span>
-                                    <span className="text-sm text-gray-500 ml-2">({user.role})</span>
+                                    <span className="font-medium">{user.username}</span>
+                                    <span className="text-sm text-gray-500 ml-2">({user.email})</span>
+                                    <span className="text-sm text-gray-500 ml-2">{user.role}</span>
                                 </div>
                                 <button 
                                     className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                                    onClick={() => handleDeleteUser(user)}
+                                    onClick={() => initiateDeleteUser(user)}
                                     disabled={loading || user.id === currentUser.uid}
                                 >
                                     <Trash2 className="h-5 w-5" />
@@ -228,6 +313,43 @@ const AdminDashboard = () => {
                             </div>
                         ))}
                     </div>
+
+                    {showDeleteConfirm && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+                                <h3 className="text-lg font-medium mb-4">Confirm User Deletion</h3>
+                                <p className="text-sm text-gray-600 mb-4">
+                                    Please enter your admin password to confirm deletion of user: {userToDelete?.email}
+                                </p>
+                                <input
+                                    type="password"
+                                    className="w-full border rounded p-2 mb-4"
+                                    placeholder="Your admin password"
+                                    value={deleteUserPassword}
+                                    onChange={(e) => setDeleteUserPassword(e.target.value)}
+                                />
+                                <div className="flex justify-end space-x-3">
+                                    <button
+                                        className="px-4 py-2 text-gray-600"
+                                        onClick={() => {
+                                            setShowDeleteConfirm(false);
+                                            setDeleteUserPassword('');
+                                            setUserToDelete(null);
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                                        onClick={handleDeleteUser}
+                                        disabled={loading}
+                                    >
+                                        {loading ? 'Deleting...' : 'Delete User'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="bg-white shadow rounded-lg p-6">
                         <h3 className="text-xl font-semibold mb-4">Post Announcement</h3>
