@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, query, orderBy, onSnapshot, updateDoc, doc, where } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
 const MaintenanceRequest = () => {

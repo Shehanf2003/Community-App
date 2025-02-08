@@ -1,12 +1,12 @@
-import 'react';
+import React from 'react';
 import { BrowserRouter as Router, Route, Navigate, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext.jsx';
 import Login from './components/Login.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import UserDashboard from './components/UserDashboard.jsx';
+import MaintenanceRequest from './components/MaintenanceRequest.jsx';
 
-
-// eslint-disable-next-line react/prop-types
+// ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
     const { currentUser, userRole, loading } = useAuth();
 
@@ -31,6 +31,8 @@ const App = () => {
             <Router>
                 <Routes>
                     <Route path="/login" element={<Login />} />
+                    
+                    {/* Admin routes */}
                     <Route
                         path="/admin"
                         element={
@@ -40,6 +42,16 @@ const App = () => {
                         }
                     />
                     <Route
+                        path="/admin/maintenance"
+                        element={
+                            <ProtectedRoute requiredRole="admin">
+                                <MaintenanceRequest />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* User routes */}
+                    <Route
                         path="/user"
                         element={
                             <ProtectedRoute requiredRole="user">
@@ -47,11 +59,36 @@ const App = () => {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                        path="/user/maintenance"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <MaintenanceRequest />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Root redirect */}
                     <Route path="/" element={<Navigate to="/login" />} />
+                    
+                    {/* Maintenance redirect based on role */}
+                    <Route 
+                        path="/maintenance" 
+                        element={
+                            <ProtectedRoute>
+                                {({ userRole }) => (
+                                    <Navigate 
+                                        to={userRole === 'admin' ? '/admin/maintenance' : '/user/maintenance'} 
+                                        replace 
+                                    />
+                                )}
+                            </ProtectedRoute>
+                        } 
+                    />
                 </Routes>
             </Router>
         </AuthProvider>
     );
 };
 
-export default App;
+export default App;

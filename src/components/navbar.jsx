@@ -1,16 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import MaintenanceRequest from './components/MaintenanceRequest.jsx';
-
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const Navbar = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, userRole } = useAuth();
   const location = useLocation();
+  const [username, setUsername] = useState('');
+
+  useEffect(() => {
+    const fetchUsername = async () => {
+      if (currentUser?.uid) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            setUsername(userDoc.data().username);
+          }
+        } catch (error) {
+          console.error('Error fetching username:', error);
+          setUsername('User');
+        }
+      }
+    };
+
+    fetchUsername();
+  }, [currentUser]);
 
   const isActiveRoute = (route) => {
     return location.pathname === route ? 'bg-blue-700' : '';
   };
+
+  const basePath = userRole === 'admin' ? '/admin' : '/user';
+  const maintenancePath = `${basePath}/maintenance`;
 
   return (
     <nav className="bg-blue-600 shadow-lg">
@@ -18,18 +40,18 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <span className="text-white text-xl font-bold">Dashboard</span>
+              <span className="text-white text-xl font-bold">Maintenance Portal</span>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
               <Link
-                to="/dashboard"
-                className={`${isActiveRoute('/dashboard')} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+                to={basePath}
+                className={`${isActiveRoute(basePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
               >
-                Announcements
+                Dashboard
               </Link>
               <Link
-                to="/maintenance"
-                className={`${isActiveRoute('/maintenance')} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+                to={maintenancePath}
+                className={`${isActiveRoute(maintenancePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
               >
                 Maintenance Requests
               </Link>
@@ -39,11 +61,11 @@ const Navbar = () => {
             <div className="flex-shrink-0">
               <div className="flex items-center space-x-3">
                 <span className="text-white text-sm">
-                  Welcome, {currentUser?.displayName || 'User'}
+                  Welcome, {username || 'User'}
                 </span>
                 <img
                   className="h-8 w-8 rounded-full bg-blue-300"
-                  src={currentUser?.photoURL || '/api/placeholder/32/32'}
+                  src="/api/placeholder/32/32"
                   alt="User avatar"
                 />
               </div>
@@ -54,16 +76,16 @@ const Navbar = () => {
 
       {/* Mobile menu */}
       <div className="sm:hidden">
-        <div className="px-2 pt-2 pb-3 space-y-1">
+        <div className="px-2 pt-2 pb-3">
           <Link
-            to="/dashboard"
-            className={`${isActiveRoute('/dashboard')} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            to={basePath}
+            className={`${isActiveRoute(basePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
           >
-            Announcements
+            Dashboard
           </Link>
           <Link
-            to="/maintenance"
-            className={`${isActiveRoute('/maintenance')} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            to={maintenancePath}
+            className={`${isActiveRoute(maintenancePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
           >
             Maintenance Requests
           </Link>
