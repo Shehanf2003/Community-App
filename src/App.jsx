@@ -5,6 +5,7 @@ import Login from './components/Login.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import UserDashboard from './components/UserDashboard.jsx';
 
+
 // eslint-disable-next-line react/prop-types
 const ProtectedRoute = ({ children, requiredRole }) => {
     const { currentUser, userRole, loading } = useAuth();
