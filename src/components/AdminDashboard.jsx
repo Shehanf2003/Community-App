@@ -4,6 +4,7 @@ import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, quer
 import { useAuth } from '../contexts/AuthContext';
 import { Trash2 } from "lucide-react";
 
+
 const AdminDashboard = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -11,6 +12,7 @@ const AdminDashboard = () => {
     const [role, setRole] = useState('user');
     const [users, setUsers] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
+    const [maintenanceRequests, setMaintenanceRequests] = useState([]);
     const [newAnnouncement, setNewAnnouncement] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -19,14 +21,17 @@ const AdminDashboard = () => {
     const [deleteUserPassword, setDeleteUserPassword] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
+    const [activeTab, setActiveTab] = useState('users');
 
     const { currentUser } = useAuth();
     const auth = getAuth();
     const db = getFirestore();
+    
 
     useEffect(() => {
         fetchUsers();
         fetchAnnouncements();
+        fetchMaintenanceRequests();
     }, []);
 
     const fetchUsers = async () => {
@@ -54,6 +59,58 @@ const AdminDashboard = () => {
             setAnnouncements(announcementsList);
         } catch (err) {
             setError('Error fetching announcements: ' + err.message);
+        }
+    };
+    const fetchMaintenanceRequests = async () => {
+        try {
+            const q = query(
+                collection(db, 'maintenance_requests'),
+                orderBy('createdAt', 'desc')
+            );
+            const querySnapshot = await getDocs(q);
+            const requests = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMaintenanceRequests(requests);
+        } catch (error) {
+            setError('Error fetching maintenance requests: ' + error.message);
+        }
+    };
+    const handleMaintenanceStatusUpdate = async (requestId, newStatus) => {
+        try {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            await updateDoc(requestRef, {
+                status: newStatus,
+                updatedAt: new Date(),
+                updatedBy: currentUser.uid
+            });
+            await fetchMaintenanceRequests();
+            setSuccess(`Maintenance request status updated to ${newStatus}`);
+        } catch (error) {
+            setError('Error updating maintenance status: ' + error.message);
+        }
+    };
+    const handleMaintenanceReply = async (requestId, reply) => {
+        try {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            const request = maintenanceRequests.find(r => r.id === requestId);
+            
+            await updateDoc(requestRef, {
+                comments: [...(request.comments || []), {
+                    content: reply,
+                    userId: currentUser.uid,
+                    userName: currentUser.displayName,
+                    createdAt: new Date(),
+                    isAdminReply: true
+                }],
+                lastRepliedAt: new Date()
+            });
+            
+            await fetchMaintenanceRequests();
+            setSuccess('Reply added successfully');
+        } catch (error) {
+            setError('Error adding reply: ' + error.message);
         }
     };
 
@@ -224,8 +281,32 @@ const AdminDashboard = () => {
                             {success}
                         </div>
                     )}
+                    {/* Tab Navigation */}
+                    <div className="flex border-b mb-6">
+                        <button
+                            className={`px-4 py-2 mr-2 ${activeTab === 'users' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('users')}
+                        >
+                            User Management
+                        </button>
+                        <button
+                            className={`px-4 py-2 mr-2 ${activeTab === 'maintenance' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('maintenance')}
+                        >
+                            Maintenance Requests
+                        </button>
+                        <button
+                            className={`px-4 py-2 ${activeTab === 'announcements' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('announcements')}
+                        >
+                            Announcements
+                        </button>
+                    </div>
 
-                    <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                                       {/* Tab Content */}
+                                       {activeTab === 'users' && (
+                        <div>
+                             <div className="bg-gray-50 p-6 rounded-lg mb-6">
                         <h3 className="text-xl font-semibold mb-4">Register New User</h3>
                         <form onSubmit={handleRegisterUser} className="space-y-4">
                             <div>
@@ -289,9 +370,7 @@ const AdminDashboard = () => {
                                 {loading ? 'Registering...' : 'Register User'}
                             </button>
                         </form>
-                    </div>
-
-                    <div className="bg-white shadow rounded-lg p-6 mb-6">
+                        <div className="bg-white shadow rounded-lg p-6 mb-6">
                         <h3 className="text-xl font-semibold mb-4">Registered Users</h3>
                         {users.map((user) => (
                             <div 
@@ -350,8 +429,14 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                     )}
+                    </div>
+                        </div>
+                    )}
 
-                    <div className="bg-white shadow rounded-lg p-6">
+                  
+                    {activeTab === 'announcements' && (
+                        <div>
+                                               <div className="bg-white shadow rounded-lg p-6">
                         <h3 className="text-xl font-semibold mb-4">Post Announcement</h3>
                         <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
                             <div>
@@ -390,6 +475,64 @@ const AdminDashboard = () => {
                             ))}
                         </div>
                     </div>
+                        </div>
+                    )}
+                   
+                   {activeTab === 'maintenance' && (
+                        <div className="space-y-6">
+                            <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+                            {maintenanceRequests.map((request) => (
+                                <div key={request.id} className="bg-white shadow rounded-lg p-6 mb-4">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h4 className="text-lg font-semibold">{request.title}</h4>
+                                            <p className="text-sm text-gray-500">
+                                                Submitted by {request.userName} on{' '}
+                                                {new Date(request.createdAt.toDate()).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <span className={`px-3 py-1 rounded-full text-sm ${
+                                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                            request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                            'bg-green-100 text-green-800'
+                                        }`}>
+                                            {request.status}
+                                        </span>
+                                    </div>
+                                    
+                                    <p className="mb-4">{request.description}</p>
+                                    <div className="flex items-center space-x-4 mb-4">
+                                        <span className="text-sm text-gray-500">Location: {request.location}</span>
+                                        <span className="text-sm text-gray-500">Priority: {request.priority}</span>
+                                    </div>
+
+                                    <div className="flex space-x-2 mb-6">
+                                        <button
+                                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'in_progress')}
+                                            disabled={request.status === 'in_progress'}
+                                            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            Mark In Progress
+                                        </button>
+                                        <button
+                                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'completed')}
+                                            disabled={request.status === 'completed'}
+                                            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
+                                        >
+                                            Mark Completed
+                                        </button>
+                                    </div>
+
+                                    <MaintenanceRequestCard 
+                                        request={request}
+                                        onStatusUpdate={handleMaintenanceStatusUpdate}
+                                        onReply={handleMaintenanceReply}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                 </div>
             </div>
         </div>
