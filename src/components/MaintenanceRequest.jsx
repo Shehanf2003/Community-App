@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, query, orderBy, onSnapshot, updateDoc, doc, where } from 'firebase/firestore';
+import { collection, addDoc, query, where, orderBy, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -12,19 +12,14 @@ const MaintenanceRequest = () => {
     location: '',
   });
   const [loading, setLoading] = useState(false);
-  const { currentUser, userRole } = useAuth();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
-    let q;
-    if (userRole === 'admin') {
-      q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
-    } else {
-      q = query(
-        collection(db, 'maintenance_requests'),
-        where('userId', '==', currentUser.uid),
-        orderBy('createdAt', 'desc')
-      );
-    }
+    const q = query(
+      collection(db, 'maintenance_requests'),
+      where('userId', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const requestsData = snapshot.docs.map(doc => ({
@@ -35,7 +30,7 @@ const MaintenanceRequest = () => {
     });
 
     return () => unsubscribe();
-  }, [currentUser.uid, userRole]);
+  }, [currentUser.uid]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -49,7 +44,6 @@ const MaintenanceRequest = () => {
         status: 'pending',
         createdAt: new Date(),
         updatedAt: new Date(),
-        assignedTo: null,
         comments: []
       });
 
@@ -63,35 +57,6 @@ const MaintenanceRequest = () => {
       console.error('Error submitting request:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateStatus = async (requestId, newStatus) => {
-    try {
-      const requestRef = doc(db, 'maintenance_requests', requestId);
-      await updateDoc(requestRef, {
-        status: newStatus,
-        updatedAt: new Date()
-      });
-    } catch (error) {
-      console.error('Error updating status:', error);
-    }
-  };
-
-  const addComment = async (requestId, comment) => {
-    try {
-      const requestRef = doc(db, 'maintenance_requests', requestId);
-      await updateDoc(requestRef, {
-        comments: [...requests.find(r => r.id === requestId).comments, {
-          content: comment,
-          userId: currentUser.uid,
-          userName: currentUser.displayName,
-          createdAt: new Date()
-        }],
-        updatedAt: new Date()
-      });
-    } catch (error) {
-      console.error('Error adding comment:', error);
     }
   };
 
@@ -162,8 +127,7 @@ const MaintenanceRequest = () => {
                 <div>
                   <h3 className="text-xl font-semibold">{request.title}</h3>
                   <p className="text-sm text-gray-500">
-                    Submitted by {request.userName} on{' '}
-                    {new Date(request.createdAt.toDate()).toLocaleDateString()}
+                    Submitted on {new Date(request.createdAt.toDate()).toLocaleDateString()}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm ${
@@ -181,36 +145,20 @@ const MaintenanceRequest = () => {
                 <span className="text-sm text-gray-500">Priority: {request.priority}</span>
               </div>
 
-              {userRole === 'admin' && (
-                <div className="flex space-x-2 mt-4">
-                  <button
-                    onClick={() => updateStatus(request.id, 'in_progress')}
-                    disabled={request.status === 'in_progress'}
-                    className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Mark In Progress
-                  </button>
-                  <button
-                    onClick={() => updateStatus(request.id, 'completed')}
-                    disabled={request.status === 'completed'}
-                    className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Mark Completed
-                  </button>
+              {/* Display admin replies */}
+              {request.comments?.length > 0 && (
+                <div className="mt-4 border-t pt-4">
+                  <h4 className="font-semibold mb-2">Admin Responses:</h4>
+                  {request.comments.map((comment, index) => (
+                    <div key={index} className="bg-gray-50 p-3 rounded mb-2">
+                      <p>{comment.content}</p>
+                      <p className="text-sm text-gray-500">
+                        {comment.userName} - {new Date(comment.createdAt.toDate()).toLocaleDateString()}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
-
-              <div className="mt-6">
-                <h4 className="font-semibold mb-2">Comments</h4>
-                {request.comments?.map((comment, index) => (
-                  <div key={index} className="bg-gray-50 p-3 rounded mb-2">
-                    <p>{comment.content}</p>
-                    <p className="text-sm text-gray-500">
-                      {comment.userName} - {new Date(comment.createdAt.toDate()).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         ))}

@@ -77,41 +77,60 @@ const AdminDashboard = () => {
             setError('Error fetching maintenance requests: ' + error.message);
         }
     };
+
     const handleMaintenanceStatusUpdate = async (requestId, newStatus) => {
         try {
-            const requestRef = doc(db, 'maintenance_requests', requestId);
-            await updateDoc(requestRef, {
-                status: newStatus,
-                updatedAt: new Date(),
-                updatedBy: currentUser.uid
-            });
-            await fetchMaintenanceRequests();
-            setSuccess(`Maintenance request status updated to ${newStatus}`);
+          const requestRef = doc(db, 'maintenance_requests', requestId);
+          await updateDoc(requestRef, {
+            status: newStatus,
+            updatedAt: new Date(),
+            updatedBy: currentUser.uid
+          });
+          setSuccess(`Status updated to ${newStatus}`);
         } catch (error) {
-            setError('Error updating maintenance status: ' + error.message);
+          setError('Error updating status: ' + error.message);
         }
-    };
+      };
     const handleMaintenanceReply = async (requestId, reply) => {
         try {
-            const requestRef = doc(db, 'maintenance_requests', requestId);
-            const request = maintenanceRequests.find(r => r.id === requestId);
-            
-            await updateDoc(requestRef, {
-                comments: [...(request.comments || []), {
-                    content: reply,
-                    userId: currentUser.uid,
-                    userName: currentUser.displayName,
-                    createdAt: new Date(),
-                    isAdminReply: true
-                }],
-                lastRepliedAt: new Date()
-            });
-            
-            await fetchMaintenanceRequests();
-            setSuccess('Reply added successfully');
+          const requestRef = doc(db, 'maintenance_requests', requestId);
+          const request = maintenanceRequests.find(r => r.id === requestId);
+          
+          await updateDoc(requestRef, {
+            comments: [...(request.comments || []), {
+              content: reply,
+              userId: currentUser.uid,
+              userName: currentUser.displayName,
+              createdAt: new Date(),
+              isAdminReply: true
+            }],
+            updatedAt: new Date()
+          });
+          
+          setSuccess('Reply sent successfully');
         } catch (error) {
-            setError('Error adding reply: ' + error.message);
+          setError('Error sending reply: ' + error.message);
         }
+      };
+
+      const MaintenanceRequestCard = ({ request, onStatusUpdate, onReply }) => {
+        const [replyText, setReplyText] = useState('');
+        const [isSubmitting, setIsSubmitting] = useState(false);
+      
+        const handleReplySubmit = async (e) => {
+          e.preventDefault();
+          if (!replyText.trim()) return;
+      
+          setIsSubmitting(true);
+          try {
+            await onReply(request.id, replyText);
+            setReplyText('');
+          } catch (error) {
+            console.error('Error submitting reply:', error);
+          } finally {
+            setIsSubmitting(false);
+          }
+        };
     };
 
     const handleRegisterUser = async (e) => {
@@ -478,60 +497,95 @@ const AdminDashboard = () => {
                         </div>
                     )}
                    
-                   {activeTab === 'maintenance' && (
-                        <div className="space-y-6">
-                            <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
-                            {maintenanceRequests.map((request) => (
-                                <div key={request.id} className="bg-white shadow rounded-lg p-6 mb-4">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h4 className="text-lg font-semibold">{request.title}</h4>
-                                            <p className="text-sm text-gray-500">
-                                                Submitted by {request.userName} on{' '}
-                                                {new Date(request.createdAt.toDate()).toLocaleDateString()}
-                                            </p>
-                                        </div>
-                                        <span className={`px-3 py-1 rounded-full text-sm ${
-                                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                            request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                            'bg-green-100 text-green-800'
-                                        }`}>
-                                            {request.status}
-                                        </span>
+            {activeTab === 'maintenance' && (
+                <div className="space-y-6">
+                    <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+                    {maintenanceRequests.map((request) => (
+                    <div key={request.id} className="bg-white shadow rounded-lg p-6 mb-4">
+                         <div className="mt-4">
+                                <h5 className="text-lg font-medium mb-2">Response History</h5>
+                                <div className="space-y-3 mb-4">
+                                    {request.comments?.map((comment, index) => (
+                                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                                        <p className="text-gray-800">{comment.content}</p>
+                                        <p className="text-sm text-gray-500 mt-1">
+                                        {comment.userName} - {new Date(comment.createdAt.toDate()).toLocaleDateString()}
+                                        </p>
                                     </div>
-                                    
-                                    <p className="mb-4">{request.description}</p>
-                                    <div className="flex items-center space-x-4 mb-4">
-                                        <span className="text-sm text-gray-500">Location: {request.location}</span>
-                                        <span className="text-sm text-gray-500">Priority: {request.priority}</span>
-                                    </div>
-
-                                    <div className="flex space-x-2 mb-6">
-                                        <button
-                                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'in_progress')}
-                                            disabled={request.status === 'in_progress'}
-                                            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
-                                        >
-                                            Mark In Progress
-                                        </button>
-                                        <button
-                                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'completed')}
-                                            disabled={request.status === 'completed'}
-                                            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-                                        >
-                                            Mark Completed
-                                        </button>
-                                    </div>
-
-                                    <MaintenanceRequestCard 
-                                        request={request}
-                                        onStatusUpdate={handleMaintenanceStatusUpdate}
-                                        onReply={handleMaintenanceReply}
-                                    />
+                                    ))}
                                 </div>
-                            ))}
+
+                                <form onSubmit={handleReplySubmit} className="flex gap-2">
+                                    <input
+                                    type="text"
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    placeholder="Type your response..."
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    disabled={isSubmitting}
+                                    />
+                                    <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                    {isSubmitting ? 'Sending...' : 'Send Reply'}
+                                    </button>
+                                </form>
+                                </div>
+                        <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h4 className="text-lg font-semibold">{request.title}</h4>
+                            <p className="text-sm text-gray-500">
+                            Submitted by {request.userName} on{' '}
+                            {new Date(request.createdAt.toDate()).toLocaleDateString()}
+                            </p>
                         </div>
-                    )}
+                        <span className={`px-3 py-1 rounded-full text-sm ${
+                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
+                        }`}>
+                            {request.status}
+                        </span>
+                        </div>
+                        
+                        <p className="mb-4">{request.description}</p>
+                        <div className="flex items-center space-x-4 mb-4">
+                        <span className="text-sm text-gray-500">Location: {request.location}</span>
+                        <span className="text-sm text-gray-500">Priority: {request.priority}</span>
+                        </div>
+
+                        <div className="flex space-x-2 mb-6">
+                        <button
+                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'in_progress')}
+                            disabled={request.status === 'in_progress'}
+                            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            Mark In Progress
+                        </button>
+                        <button
+                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'completed')}
+                            disabled={request.status === 'completed'}
+                            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
+                        >
+                            Mark Completed
+                        </button>
+                        </div>
+
+                        <MaintenanceRequestCard 
+                        request={request}
+                        onStatusUpdate={handleMaintenanceStatusUpdate}
+                        onReply={handleMaintenanceReply}
+                        />
+                    </div>
+                    ))}
+                </div>
+                
+                )}
+
+                                                
+
 
                 </div>
             </div>

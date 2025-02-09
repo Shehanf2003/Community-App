@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import Notifications from './notifications';
 
 const Navbar = () => {
   const { currentUser, userRole } = useAuth();
@@ -47,7 +48,7 @@ const Navbar = () => {
                 to={basePath}
                 className={`${isActiveRoute(basePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
               >
-                Dashboard
+                Announcement
               </Link>
               <Link
                 to={maintenancePath}
@@ -60,14 +61,11 @@ const Navbar = () => {
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="flex items-center space-x-3">
+              <Notifications />
                 <span className="text-white text-sm">
                   Welcome, {username || 'User'}
                 </span>
-                <img
-                  className="h-8 w-8 rounded-full bg-blue-300"
-                  src="/api/placeholder/32/32"
-                  alt="User avatar"
-                />
+               
               </div>
             </div>
           </div>
@@ -81,7 +79,7 @@ const Navbar = () => {
             to={basePath}
             className={`${isActiveRoute(basePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
           >
-            Dashboard
+            Announcement
           </Link>
           <Link
             to={maintenancePath}
