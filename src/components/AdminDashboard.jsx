@@ -22,6 +22,8 @@ const AdminDashboard = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
     const [activeTab, setActiveTab] = useState('users');
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [replyText, setReplyText] = useState('');
 
     const { currentUser } = useAuth();
     const auth = getAuth();
@@ -48,6 +50,20 @@ const AdminDashboard = () => {
         }
     };
 
+    const fetchMaintenanceRequests = async () => {
+        try {
+            const q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+            const requestsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMaintenanceRequests(requestsList);
+        } catch (err) {
+            setError('Error fetching maintenance requests: ' + err.message);
+        }
+    };
+
     const fetchAnnouncements = async () => {
         try {
             const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
@@ -61,76 +77,45 @@ const AdminDashboard = () => {
             setError('Error fetching announcements: ' + err.message);
         }
     };
-    const fetchMaintenanceRequests = async () => {
+    const handleMaintenanceStatusChange = async (requestId, newStatus) => {
+        setLoading(true);
         try {
-            const q = query(
-                collection(db, 'maintenance_requests'),
-                orderBy('createdAt', 'desc')
-            );
-            const querySnapshot = await getDocs(q);
-            const requests = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            setMaintenanceRequests(requests);
+            await updateDoc(doc(db, 'maintenance_requests', requestId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            });
+            await fetchMaintenanceRequests(); // Refresh the list
+            setSuccess('Status updated successfully');
         } catch (error) {
-            setError('Error fetching maintenance requests: ' + error.message);
+            setError('Error updating status: ' + error.message);
+        } finally {
+            setLoading(false);
         }
     };
-
-    const handleMaintenanceStatusUpdate = async (requestId, newStatus) => {
+    const handleMaintenanceReply = async (requestId, replyText) => {
+        if (!replyText.trim()) return;
+        setLoading(true);
+        
         try {
-          const requestRef = doc(db, 'maintenance_requests', requestId);
-          await updateDoc(requestRef, {
-            status: newStatus,
-            updatedAt: new Date(),
-            updatedBy: currentUser.uid
-          });
-          setSuccess(`Status updated to ${newStatus}`);
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            const request = maintenanceRequests.find(r => r.id === requestId);
+            
+            await updateDoc(requestRef, {
+                comments: [...(request.comments || []), {
+                    content: replyText,
+                    createdAt: serverTimestamp(),
+                    createdBy: currentUser.uid,
+                    isAdminReply: true
+                }]
+            });
+            await fetchMaintenanceRequests(); // Refresh the list
+            setSuccess('Reply sent successfully');
         } catch (error) {
-          setError('Error updating status: ' + error.message);
+            setError('Error sending reply: ' + error.message);
+        } finally {
+            setLoading(false);
         }
-      };
-    const handleMaintenanceReply = async (requestId, reply) => {
-        try {
-          const requestRef = doc(db, 'maintenance_requests', requestId);
-          const request = maintenanceRequests.find(r => r.id === requestId);
-          
-          await updateDoc(requestRef, {
-            comments: [...(request.comments || []), {
-              content: reply,
-              userId: currentUser.uid,
-              userName: currentUser.displayName,
-              createdAt: new Date(),
-              isAdminReply: true
-            }],
-            updatedAt: new Date()
-          });
-          
-          setSuccess('Reply sent successfully');
-        } catch (error) {
-          setError('Error sending reply: ' + error.message);
-        }
-      };
-
-      const MaintenanceRequestCard = ({ request, onStatusUpdate, onReply }) => {
-        const [replyText, setReplyText] = useState('');
-        const [isSubmitting, setIsSubmitting] = useState(false);
-      
-        const handleReplySubmit = async (e) => {
-          e.preventDefault();
-          if (!replyText.trim()) return;
-      
-          setIsSubmitting(true);
-          try {
-            await onReply(request.id, replyText);
-            setReplyText('');
-          } catch (error) {
-            console.error('Error submitting reply:', error);
-          } finally {
-            setIsSubmitting(false);
-          }
-        };
     };
 
     const handleRegisterUser = async (e) => {
@@ -497,89 +482,74 @@ const AdminDashboard = () => {
                         </div>
                     )}
                    
-            {activeTab === 'maintenance' && (
+                    {activeTab === 'maintenance' && (
                 <div className="space-y-6">
-                    <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
-                    {maintenanceRequests.map((request) => (
-                    <div key={request.id} className="bg-white shadow rounded-lg p-6 mb-4">
-                         <div className="mt-4">
-                                <h5 className="text-lg font-medium mb-2">Response History</h5>
-                                <div className="space-y-3 mb-4">
-                                    {request.comments?.map((comment, index) => (
-                                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                                        <p className="text-gray-800">{comment.content}</p>
-                                        <p className="text-sm text-gray-500 mt-1">
-                                        {comment.userName} - {new Date(comment.createdAt.toDate()).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                    ))}
-                                </div>
-
-                                <form onSubmit={handleReplySubmit} className="flex gap-2">
-                                    <input
-                                    type="text"
-                                    value={replyText}
-                                    onChange={(e) => setReplyText(e.target.value)}
-                                    placeholder="Type your response..."
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    disabled={isSubmitting}
-                                    />
-                                    <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                                    >
-                                    {isSubmitting ? 'Sending...' : 'Send Reply'}
-                                    </button>
-                                </form>
-                                </div>
-                        <div className="flex justify-between items-start mb-4">
-                        <div>
-                            <h4 className="text-lg font-semibold">{request.title}</h4>
-                            <p className="text-sm text-gray-500">
-                            Submitted by {request.userName} on{' '}
-                            {new Date(request.createdAt.toDate()).toLocaleDateString()}
-                            </p>
-                        </div>
-                        <span className={`px-3 py-1 rounded-full text-sm ${
-                            request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                            'bg-green-100 text-green-800'
-                        }`}>
-                            {request.status}
-                        </span>
-                        </div>
-                        
-                        <p className="mb-4">{request.description}</p>
-                        <div className="flex items-center space-x-4 mb-4">
-                        <span className="text-sm text-gray-500">Location: {request.location}</span>
-                        <span className="text-sm text-gray-500">Priority: {request.priority}</span>
-                        </div>
-
-                        <div className="flex space-x-2 mb-6">
-                        <button
-                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'in_progress')}
-                            disabled={request.status === 'in_progress'}
-                            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 disabled:opacity-50"
-                        >
-                            Mark In Progress
-                        </button>
-                        <button
-                            onClick={() => handleMaintenanceStatusUpdate(request.id, 'completed')}
-                            disabled={request.status === 'completed'}
-                            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50"
-                        >
-                            Mark Completed
-                        </button>
-                        </div>
-
-                        <MaintenanceRequestCard 
-                        request={request}
-                        onStatusUpdate={handleMaintenanceStatusUpdate}
-                        onReply={handleMaintenanceReply}
-                        />
-                    </div>
-                    ))}
+             <div className="space-y-4">
+      <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+      
+      {maintenanceRequests.map((request) => (
+        <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
+          <div className="flex justify-between items-start">
+            <div>
+              <h4 className="font-medium">{request.title}</h4>
+              <p className="text-sm text-gray-500">
+                Submitted by: {request.userName} | Location: {request.location}
+              </p>
+              <p className="text-sm text-gray-500">
+                Priority: {request.priority} | Status: {request.status}
+              </p>
+            </div>
+            <select
+              className="text-sm border rounded-md p-1"
+              value={request.status}
+              onChange={(e) => handleStatusChange(request.id, e.target.value)}
+              disabled={loading}
+            >
+              <option>Pending</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          
+          <p className="text-gray-700">{request.description}</p>
+          
+          {request.comments && request.comments.length > 0 && (
+            <div className="mt-3 space-y-2">
+              <h5 className="font-medium">Comments:</h5>
+              {request.comments.map((comment, index) => (
+                <div key={index} className="bg-gray-50 p-2 rounded">
+                  <p className="text-sm">{comment.content}</p>
+                  <p className="text-xs text-gray-500">
+                    {comment.isAdminReply ? 'Admin Reply' : 'User Comment'} - 
+                    {new Date(comment.createdAt?.toDate()).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+          
+          <div className="mt-3">
+            <textarea
+              className="w-full border rounded-md p-2 text-sm"
+              placeholder="Write a reply..."
+              value={selectedRequest === request.id ? replyText : ''}
+              onChange={(e) => {
+                setSelectedRequest(request.id);
+                setReplyText(e.target.value);
+              }}
+            />
+            <button
+              className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+              onClick={() => handleReply(request.id)}
+              disabled={loading || !replyText.trim()}
+            >
+              Send Reply
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
                 </div>
                 
                 )}
