@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAuth, createUserWithEmailAndPassword, EmailAuthProvider,reauthenticateWithCredential,signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc,  updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
 import { Trash2 } from "lucide-react";
 
@@ -80,7 +80,8 @@ const AdminDashboard = () => {
     const handleMaintenanceStatusChange = async (requestId, newStatus) => {
         setLoading(true);
         try {
-            await updateDoc(doc(db, 'maintenance_requests', requestId), {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            await updateDoc(requestRef, {
                 status: newStatus,
                 updatedAt: serverTimestamp(),
                 updatedBy: currentUser.uid
@@ -93,6 +94,7 @@ const AdminDashboard = () => {
             setLoading(false);
         }
     };
+
     const handleMaintenanceReply = async (requestId, replyText) => {
         if (!replyText.trim()) return;
         setLoading(true);
@@ -101,15 +103,39 @@ const AdminDashboard = () => {
             const requestRef = doc(db, 'maintenance_requests', requestId);
             const request = maintenanceRequests.find(r => r.id === requestId);
             
+            // Create a new Date object for the comment timestamp
+            const currentDate = new Date();
+            
+            // Add the reply to maintenance request with a regular timestamp
             await updateDoc(requestRef, {
                 comments: [...(request.comments || []), {
                     content: replyText,
-                    createdAt: serverTimestamp(),
+                    createdAt: currentDate,
                     createdBy: currentUser.uid,
                     isAdminReply: true
-                }]
+                }],
+                lastUpdated: serverTimestamp() // This is fine outside the array
             });
-            await fetchMaintenanceRequests(); // Refresh the list
+    
+            // Create notification for the user
+            const notificationRef = collection(db, 'notifications');
+            await addDoc(notificationRef, {
+                userId: request.userId,
+                type: 'maintenance_reply',
+                requestId: requestId,
+                content: replyText,
+                read: false,
+                createdAt: serverTimestamp(), // This is fine for a new document
+                maintenanceTitle: request.title
+            });
+    
+            // Clear the reply text for this request
+            if (selectedRequest === requestId) {
+                setReplyText('');
+                setSelectedRequest(null);
+            }
+    
+            await fetchMaintenanceRequests();
             setSuccess('Reply sent successfully');
         } catch (error) {
             setError('Error sending reply: ' + error.message);
@@ -481,85 +507,80 @@ const AdminDashboard = () => {
                     </div>
                         </div>
                     )}
-                   
-                    {activeTab === 'maintenance' && (
-                <div className="space-y-6">
-             <div className="space-y-4">
-      <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
-      
-      {maintenanceRequests.map((request) => (
-        <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <h4 className="font-medium">{request.title}</h4>
-              <p className="text-sm text-gray-500">
-                Submitted by: {request.userName} | Location: {request.location}
-              </p>
-              <p className="text-sm text-gray-500">
-                Priority: {request.priority} | Status: {request.status}
-              </p>
-            </div>
-            <select
-              className="text-sm border rounded-md p-1"
-              value={request.status}
-              onChange={(e) => handleStatusChange(request.id, e.target.value)}
-              disabled={loading}
-            >
-              <option>Pending</option>
-              <option>In Progress</option>
-              <option>Completed</option>
-              <option>Cancelled</option>
-            </select>
-          </div>
-          
-          <p className="text-gray-700">{request.description}</p>
-          
-          {request.comments && request.comments.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <h5 className="font-medium">Comments:</h5>
-              {request.comments.map((comment, index) => (
-                <div key={index} className="bg-gray-50 p-2 rounded">
-                  <p className="text-sm">{comment.content}</p>
-                  <p className="text-xs text-gray-500">
-                    {comment.isAdminReply ? 'Admin Reply' : 'User Comment'} - 
-                    {new Date(comment.createdAt?.toDate()).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-          
-          <div className="mt-3">
-            <textarea
-              className="w-full border rounded-md p-2 text-sm"
-              placeholder="Write a reply..."
-              value={selectedRequest === request.id ? replyText : ''}
-              onChange={(e) => {
-                setSelectedRequest(request.id);
-                setReplyText(e.target.value);
-              }}
-            />
-            <button
-              className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-              onClick={() => handleReply(request.id)}
-              disabled={loading || !replyText.trim()}
-            >
-              Send Reply
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-                </div>
-                
-                )}
-
+                                    
+                                    {activeTab === 'maintenance' && (
+                                        <div className="space-y-6">
+                                            <div className="space-y-4">
+                                                <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
                                                 
-
-
-                </div>
-            </div>
-        </div>
+                                                {maintenanceRequests.map((request) => (
+                                                    <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <h4 className="font-medium">{request.title}</h4>
+                                                                <p className="text-sm text-gray-500">
+                                                                    Submitted by: {request.userName} | Location: {request.location}
+                                                                </p>
+                                                                <p className="text-sm text-gray-500">
+                                                                    Priority: {request.priority} | Status: {request.status}
+                                                                </p>
+                                                            </div>
+                                                            <select
+                                                                className="text-sm border rounded-md p-1"
+                                                                value={request.status}
+                                                                onChange={(e) => handleMaintenanceStatusChange(request.id, e.target.value)}
+                                                                disabled={loading}
+                                                            >
+                                                                <option value="Pending">Pending</option>
+                                                                <option value="In Progress">In Progress</option>
+                                                                <option value="Completed">Completed</option>
+                                                                <option value="Cancelled">Cancelled</option>
+                                                            </select>
+                                                        </div>
+                                                        
+                                                        <p className="text-gray-700">{request.description}</p>
+                                                        
+                                                        {request.comments && request.comments.length > 0 && (
+                                                            <div className="mt-3 space-y-2">
+                                                                <h5 className="font-medium">Comments:</h5>
+                                                                {request.comments.map((comment, index) => (
+                                                                    <div key={index} className="bg-gray-50 p-2 rounded">
+                                                                        <p className="text-sm">{comment.content}</p>
+                                                                        <p className="text-xs text-gray-500">
+                                                                            {comment.isAdminReply ? 'Admin Reply' : 'User Comment'} - {' '}
+                                                                            {comment.createdAt?.toDate().toLocaleString()}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                        
+                                                        <div className="mt-3">
+                                                            <textarea
+                                                                className="w-full border rounded-md p-2 text-sm"
+                                                                placeholder="Write a reply..."
+                                                                value={selectedRequest === request.id ? replyText : ''}
+                                                                onChange={(e) => {
+                                                                    setSelectedRequest(request.id);
+                                                                    setReplyText(e.target.value);
+                                                                }}
+                                                            />
+                                                            <button
+                                                                className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                                                                onClick={() => handleMaintenanceReply(request.id, replyText)}
+                                                                disabled={loading || !replyText.trim()}
+                                                            >
+                                                                Send Reply
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    </div>
+                                </div>
+                            </div>
     );
 };
 

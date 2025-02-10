@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import Navbar from './navbar';
 
 const MaintenanceRequest = () => {
   const [title, setTitle] = useState('');
@@ -50,6 +51,10 @@ const MaintenanceRequest = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-6">
+      
+      <div className="py-6 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white shadow rounded-lg p-6"></div>
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-2xl font-bold mb-6">Submit Maintenance Request</h2>
 
@@ -133,6 +138,8 @@ const MaintenanceRequest = () => {
           </button>
         </form>
       </div>
+    </div>
+    </div>
     </div>
   );
 };
