@@ -281,10 +281,7 @@ const AdminDashboard = () => {
 
             await addDoc(collection(db, 'announcements'), announcementData);
             
-            const userEmails = users.map(user => user.email);
-            await sendAnnouncementEmail(newAnnouncement, userEmails);
-
-            setSuccess('Announcement posted and notifications sent successfully!');
+            setSuccess('Announcement posted successfully!');
             setNewAnnouncement('');
             fetchAnnouncements();
         } catch (err) {
@@ -333,8 +330,8 @@ const AdminDashboard = () => {
                         </button>
                     </div>
 
-                                       {/* Tab Content */}
-                                       {activeTab === 'users' && (
+                        {/* Tab Content */}
+                        {activeTab === 'users' && (
                         <div>
                              <div className="bg-gray-50 p-6 rounded-lg mb-6">
                         <h3 className="text-xl font-semibold mb-4">Register New User</h3>
