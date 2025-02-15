@@ -41,7 +41,7 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <span className="text-white text-xl font-bold">Maintenance Portal</span>
+              <span className="text-white text-xl font-bold">CommUnity</span>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
               <Link

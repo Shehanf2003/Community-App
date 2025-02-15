@@ -11,7 +11,8 @@ import {
     doc,
     updateDoc,
     and,
-    or
+    or,
+    arrayUnion
 } from 'firebase/firestore';
 
 const Notifications = () => {
@@ -24,41 +25,67 @@ const Notifications = () => {
     useEffect(() => {
         if (!currentUser?.uid) return;
 
-        // Create a properly structured query using and()
-        const q = query(
+        // Create queries for both personal notifications and announcements
+        const personalQuery = query(
             collection(db, 'notifications'),
             and(
-                where('read', '==', false),
-                or(
-                    where('userId', '==', currentUser.uid),
-                    where('type', '==', 'announcement')
-                )
+                where('userId', '==', currentUser.uid),
+                where('read', '==', false)
             ),
             orderBy('createdAt', 'desc')
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const newNotifications = snapshot.docs.map(doc => ({
+        const announcementQuery = query(
+            collection(db, 'announcements'),
+            orderBy('createdAt', 'desc')
+        );
+
+        // Subscribe to personal notifications
+        const unsubscribePersonal = onSnapshot(personalQuery, (snapshot) => {
+            const personalNotifications = snapshot.docs.map(doc => ({
                 id: doc.id,
+                type: doc.data().type,
                 ...doc.data()
             }));
-            setNotifications(newNotifications);
+            setNotifications(currentNotifications => {
+                const announcements = currentNotifications.filter(n => n.isAnnouncement);
+                return [...personalNotifications, ...announcements].sort((a, b) => 
+                    b.createdAt?.toDate?.() - a.createdAt?.toDate?.());
+            });
         });
 
-        return () => unsubscribe();
+        // Subscribe to announcements
+        const unsubscribeAnnouncements = onSnapshot(announcementQuery, (snapshot) => {
+            const announcements = snapshot.docs.map(doc => ({
+                id: doc.id,
+                type: 'announcement',
+                isAnnouncement: true,
+                content: doc.data().content,
+                createdAt: doc.data().createdAt,
+                read: doc.data().read?.[currentUser.uid] || false
+            })).filter(announcement => !announcement.read);
+
+            setNotifications(currentNotifications => {
+                const personal = currentNotifications.filter(n => !n.isAnnouncement);
+                return [...personal, ...announcements].sort((a, b) => 
+                    b.createdAt?.toDate?.() - a.createdAt?.toDate?.());
+            });
+        });
+
+        return () => {
+            unsubscribePersonal();
+            unsubscribeAnnouncements();
+        };
     }, [currentUser]);
 
-    const markAsRead = async (notificationId) => {
-        const notificationRef = doc(db, 'notifications', notificationId);
-        const notification = notifications.find(n => n.id === notificationId);
-        
-        if (notification.type === 'announcement') {
-            // For announcements, update the read map with the current user's ID
-            await updateDoc(notificationRef, {
+    const markAsRead = async (notification) => {
+        if (notification.isAnnouncement) {
+            const announcementRef = doc(db, 'announcements', notification.id);
+            await updateDoc(announcementRef, {
                 [`read.${currentUser.uid}`]: true
             });
         } else {
-            // For maintenance notifications, mark as read normally
+            const notificationRef = doc(db, 'notifications', notification.id);
             await updateDoc(notificationRef, {
                 read: true
             });
@@ -139,7 +166,7 @@ const Notifications = () => {
                                 <div
                                     key={notification.id}
                                     className="p-3 hover:bg-gray-50 border-b cursor-pointer"
-                                    onClick={() => markAsRead(notification.id)}
+                                    onClick={() => markAsRead(notification)}
                                 >
                                     {renderNotificationContent(notification)}
                                     <p className="text-xs text-gray-400 mt-1">
