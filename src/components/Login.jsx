@@ -26,52 +26,50 @@ const Login = () => {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-            <div className="max-w-md w-full space-y-8">
-                <div>
-                    <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-                        Sign in to your account
-                    </h2>
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+            <div className="max-w-md w-full">
+                <div className="text-center">
+                    <h1 className="text-[#1877f2] text-6xl font-bold mb-4">CommUnity</h1>
+                    <p className="text-xl text-gray-700 mb-8">
+                        Connect with friends and the world around you on Facebook.
+                    </p>
                 </div>
-                <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+
+                <div className="bg-white p-4 rounded-lg shadow-md">
                     {error && (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                             {error}
                         </div>
                     )}
-                    <div className="rounded-md shadow-sm -space-y-px">
-                        <div>
-                            <input
-                                type="email"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Email address"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                            />
-                        </div>
-                        <div>
-                            <input
-                                type="password"
-                                required
-                                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                        </div>
-                    </div>
 
-                    <div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <input
+                            type="email"
+                            required
+                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+                            placeholder="Email or phone number"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                        />
+                        
+                        <input
+                            type="password"
+                            required
+                            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:border-blue-500"
+                            placeholder="Password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                        
                         <button
                             type="submit"
                             disabled={loading}
-                            className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            className="w-full bg-[#1877f2] text-white py-3 px-4 rounded-md font-bold hover:bg-[#166fe5] transition-colors disabled:opacity-50"
                         >
-                            {loading ? 'Signing in...' : 'Sign in'}
+                            {loading ? 'Logging in...' : 'Log in'}
                         </button>
-                    </div>
-                </form>
+                    </form>
+                </div>
             </div>
         </div>
     );
