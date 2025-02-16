@@ -34,6 +34,7 @@ const Navbar = () => {
 
   const basePath = userRole === 'admin' ? '/admin' : '/user';
   const maintenancePath = `${basePath}/maintenance`;
+  const resourcesPath = `${basePath}/resources`;
 
   return (
     <nav className="bg-blue-600 shadow-lg">
@@ -55,6 +56,12 @@ const Navbar = () => {
                 className={`${isActiveRoute(maintenancePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
               >
                 Maintenance Requests
+              </Link>
+              <Link
+                to={resourcesPath}
+                className={`${isActiveRoute(resourcesPath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+              >
+                Resource Booking
               </Link>
             </div>
           </div>
@@ -86,6 +93,12 @@ const Navbar = () => {
             className={`${isActiveRoute(maintenancePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
           >
             Maintenance Requests
+          </Link>
+          <Link
+            to={resourcesPath}
+            className={`${isActiveRoute(resourcesPath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+          >
+            Resource Booking
           </Link>
         </div>
       </div>

@@ -53,91 +53,91 @@ const MaintenanceRequest = () => {
 <div className="min-h-screen bg-gray-50">
       <Navbar />
       
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-2xl font-bold mb-6">Submit Maintenance Request</h2>
+        <div className="max-w-2xl mx-auto p-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-2xl font-bold mb-6">Submit Maintenance Request</h2>
 
-        {error && (
-          <div className="bg-red-50 text-red-700 p-4 rounded-md mb-4 border border-red-200">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="bg-red-50 text-red-700 p-4 rounded-md mb-4 border border-red-200">
+              {error}
+            </div>
+          )}
 
-        {success && (
-          <div className="bg-green-50 text-green-700 p-4 rounded-md mb-4 border border-green-200">
-            {success}
-          </div>
-        )}
+          {success && (
+            <div className="bg-green-50 text-green-700 p-4 rounded-md mb-4 border border-green-200">
+              {success}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Request Title
-            </label>
-            <input
-              type="text"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Brief title for your request"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Request Title
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Brief title for your request"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description
-            </label>
-            <textarea
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows="4"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Detailed description of the maintenance needed"
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows="4"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Detailed description of the maintenance needed"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location
-            </label>
-            <input
-              type="text"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              placeholder="Where is maintenance needed?"
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
+              <input
+                type="text"
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Where is maintenance needed?"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Priority Level
-            </label>
-            <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Priority Level
+              </label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+              >
+                <option>Low Priority</option>
+                <option>Medium Priority</option>
+                <option>High Priority</option>
+                <option>Emergency</option>
+              </select>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
             >
-              <option>Low Priority</option>
-              <option>Medium Priority</option>
-              <option>High Priority</option>
-              <option>Emergency</option>
-            </select>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
-          >
-            {loading ? 'Submitting...' : 'Submit Request'}
-          </button>
-        </form>
+              {loading ? 'Submitting...' : 'Submit Request'}
+            </button>
+          </form>
+        </div>
       </div>
-    </div>
     </div>
   );
 };

@@ -5,6 +5,7 @@ import Login from './components/Login.jsx';
 import AdminDashboard from './components/AdminDashboard.jsx';
 import UserDashboard from './components/UserDashboard.jsx';
 import MaintenanceRequest from './components/MaintenanceRequest.jsx';
+import Booking from './components/Booking.jsx';
 
 // ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -84,6 +85,14 @@ const App = () => {
                                 )}
                             </ProtectedRoute>
                         } 
+                    />
+                     <Route
+                        path="/user/resources"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <Booking />
+                            </ProtectedRoute>
+                        }
                     />
                 </Routes>
             </Router>
