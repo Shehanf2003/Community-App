@@ -6,6 +6,7 @@ import AdminDashboard from './components/AdminDashboard.jsx';
 import UserDashboard from './components/UserDashboard.jsx';
 import MaintenanceRequest from './components/MaintenanceRequest.jsx';
 import Booking from './components/Booking.jsx';
+import CommunityForum from './components/CommunityForum.jsx';
 
 // ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -94,6 +95,14 @@ const App = () => {
                             </ProtectedRoute>
                         }
                     />
+                    <Route
+                    path="/user/forum"
+                    element={
+                        <ProtectedRoute requiredRole="user">
+                            <CommunityForum />
+                        </ProtectedRoute>
+                    }
+                />
                 </Routes>
             </Router>
         </AuthProvider>

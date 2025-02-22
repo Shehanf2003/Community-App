@@ -37,69 +37,92 @@ const Navbar = () => {
   const resourcesPath = `${basePath}/resources`;
 
   return (
-    <nav className="bg-blue-600 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="bg-blue-600">
+      <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <span className="text-white text-xl font-bold">CommUnity</span>
+          {/* Left side - Logo and brand */}
+          <div className="flex items-center">
+            <div className="flex-shrink-0 flex items-center space-x-2">
+              <img 
+                src="/public/cu1.png" 
+                alt="CU Logo" 
+                className="h-8 w-8"
+              />
+              
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+          </div>
+
+          {/* Center - Navigation Links */}
+          <div className="hidden md:flex items-center justify-center flex-1 ml-8">
+            <div className="flex space-x-4">
               <Link
                 to={basePath}
-                className={`${isActiveRoute(basePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+                className={`${isActiveRoute(basePath)} text-white px-3 py-2 text-sm font-medium hover:bg-blue-700 rounded-md`}
               >
                 Announcement
               </Link>
               <Link
-                to={maintenancePath}
-                className={`${isActiveRoute(maintenancePath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+                to={`${basePath}/maintenance`}
+                className={`${isActiveRoute(`${basePath}/maintenance`)} text-white px-3 py-2 text-sm font-medium hover:bg-blue-700 rounded-md`}
               >
                 Maintenance Requests
               </Link>
               <Link
-                to={resourcesPath}
-                className={`${isActiveRoute(resourcesPath)} text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700`}
+                to={`${basePath}/resources`}
+                className={`${isActiveRoute(`${basePath}/resources`)} text-white px-3 py-2 text-sm font-medium hover:bg-blue-700 rounded-md`}
               >
                 Resource Booking
               </Link>
+              <Link
+                to={`${basePath}/forum`}
+                className={`${isActiveRoute(`${basePath}/forum`)} text-white px-3 py-2 text-sm font-medium hover:bg-blue-700 rounded-md`}
+              >
+                Community Forum
+              </Link>
             </div>
           </div>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <div className="flex items-center space-x-3">
+
+          {/* Right side - Notifications and Username */}
+          <div className="flex items-center space-x-4">
+            <div className="relative">
               <Notifications />
-                <span className="text-white text-sm">
-                  Welcome, {username || 'User'}
-                </span>
-               
-              </div>
+            </div>
+            <div className="flex items-center">
+              <span className="text-white text-sm">
+                Welcome, {username || 'User'}
+              </span>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Mobile menu */}
-      <div className="sm:hidden">
-        <div className="px-2 pt-2 pb-3">
-          <Link
-            to={basePath}
-            className={`${isActiveRoute(basePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
-          >
-            Announcement
-          </Link>
-          <Link
-            to={maintenancePath}
-            className={`${isActiveRoute(maintenancePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
-          >
-            Maintenance Requests
-          </Link>
-          <Link
-            to={resourcesPath}
-            className={`${isActiveRoute(resourcesPath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
-          >
-            Resource Booking
-          </Link>
+        {/* Mobile menu */}
+        <div className="md:hidden">
+          <div className="px-2 pt-2 pb-3 space-y-1">
+            <Link
+              to={basePath}
+              className={`${isActiveRoute(basePath)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            >
+              Announcement
+            </Link>
+            <Link
+              to={`${basePath}/maintenance`}
+              className={`${isActiveRoute(`${basePath}/maintenance`)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            >
+              Maintenance Requests
+            </Link>
+            <Link
+              to={`${basePath}/resources`}
+              className={`${isActiveRoute(`${basePath}/resources`)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            >
+              Resource Booking
+            </Link>
+            <Link
+              to={`${basePath}/forum`}
+              className={`${isActiveRoute(`${basePath}/forum`)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+            >
+              Community Forum
+            </Link>
+          </div>
         </div>
       </div>
     </nav>
