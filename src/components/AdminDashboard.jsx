@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { getAuth, createUserWithEmailAndPassword, EmailAuthProvider,reauthenticateWithCredential,signInWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc,  updateDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { Trash2 } from "lucide-react";
+import { Trash2,Edit2, Save, X } from "lucide-react";
+
 
 
 const AdminDashboard = () => {
@@ -24,6 +25,18 @@ const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('users');
     const [selectedRequest, setSelectedRequest] = useState(null);
     const [replyText, setReplyText] = useState('');
+    const [contacts, setContacts] = useState([]);
+    const [newContact, setNewContact] = useState({
+        name: '',
+        role: '',
+        email: '',
+        phone: '',
+        department: ''
+    });
+    const [editingContact, setEditingContact] = useState(null);
+    
+    
+    
 
     const { currentUser } = useAuth();
     const auth = getAuth();
@@ -34,6 +47,7 @@ const AdminDashboard = () => {
         fetchUsers();
         fetchAnnouncements();
         fetchMaintenanceRequests();
+        fetchContacts();
     }, []);
 
     const fetchUsers = async () => {
@@ -77,6 +91,20 @@ const AdminDashboard = () => {
             setError('Error fetching announcements: ' + err.message);
         }
     };
+        const fetchContacts = async () => {
+            try {
+                const contactsCollection = collection(db, 'community_contacts');
+                const contactsSnapshot = await getDocs(contactsCollection);
+                const contactsList = contactsSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                setContacts(contactsList);
+            } catch (err) {
+                setError('Error fetching contacts: ' + err.message);
+            }
+        };
+
     const handleMaintenanceStatusChange = async (requestId, newStatus) => {
         setLoading(true);
         try {
@@ -193,6 +221,53 @@ const AdminDashboard = () => {
             setError('Failed to register user: ' + err.message);
         } finally {
             setLoading(false);
+        }
+    };
+    const handleAddContact = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        setSuccess('');
+
+        try {
+            await addDoc(collection(db, 'community_contacts'), {
+                ...newContact,
+                createdAt: serverTimestamp()
+            });
+            setNewContact({
+                name: '',
+                role: '',
+                email: '',
+                phone: '',
+                department: ''
+            });
+            setSuccess('Contact added successfully!');
+            fetchContacts();
+        } catch (err) {
+            setError('Error adding contact: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleUpdateContact = async (id) => {
+        try {
+            await updateDoc(doc(db, 'community_contacts', id), editingContact);
+            setSuccess('Contact updated successfully!');
+            setEditingContact(null);
+            fetchContacts();
+        } catch (err) {
+            setError('Error updating contact: ' + err.message);
+        }
+    };
+
+       const handleDeleteContact = async (id) => {
+        try {
+            await deleteDoc(doc(db, 'community_contacts', id));
+            setSuccess('Contact deleted successfully!');
+            fetchContacts();
+        } catch (err) {
+            setError('Error deleting contact: ' + err.message);
         }
     };
 
@@ -327,6 +402,12 @@ const AdminDashboard = () => {
                             onClick={() => setActiveTab('announcements')}
                         >
                             Announcements
+                        </button>
+                        <button
+                            className={`px-4 py-2 ${activeTab === 'contacts' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('contacts')}
+                        >
+                            Community Contacts
                         </button>
                     </div>
 
@@ -505,79 +586,240 @@ const AdminDashboard = () => {
                         </div>
                     )}
                                     
-                                    {activeTab === 'maintenance' && (
-                                        <div className="space-y-6">
-                                            <div className="space-y-4">
-                                                <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
-                                                
-                                                {maintenanceRequests.map((request) => (
-                                                    <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <h4 className="font-medium">{request.title}</h4>
-                                                                <p className="text-sm text-gray-500">
-                                                                    Submitted by: {request.userName} | Location: {request.location}
-                                                                </p>
-                                                                <p className="text-sm text-gray-500">
-                                                                    Priority: {request.priority} | Status: {request.status}
-                                                                </p>
-                                                            </div>
-                                                            <select
-                                                                className="text-sm border rounded-md p-1"
-                                                                value={request.status}
-                                                                onChange={(e) => handleMaintenanceStatusChange(request.id, e.target.value)}
-                                                                disabled={loading}
-                                                            >
-                                                                <option value="Pending">Pending</option>
-                                                                <option value="In Progress">In Progress</option>
-                                                                <option value="Completed">Completed</option>
-                                                                <option value="Cancelled">Cancelled</option>
-                                                            </select>
-                                                        </div>
-                                                        
-                                                        <p className="text-gray-700">{request.description}</p>
-                                                        
-                                                        {request.comments && request.comments.length > 0 && (
-                                                            <div className="mt-3 space-y-2">
-                                                                <h5 className="font-medium">Comments:</h5>
-                                                                {request.comments.map((comment, index) => (
-                                                                    <div key={index} className="bg-gray-50 p-2 rounded">
-                                                                        <p className="text-sm">{comment.content}</p>
-                                                                        <p className="text-xs text-gray-500">
-                                                                            {comment.isAdminReply ? 'Admin Reply' : 'User Comment'} - {' '}
-                                                                            {comment.createdAt?.toDate().toLocaleString()}
-                                                                        </p>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        )}
-                                                        
-                                                        <div className="mt-3">
-                                                            <textarea
-                                                                className="w-full border rounded-md p-2 text-sm"
-                                                                placeholder="Write a reply..."
-                                                                value={selectedRequest === request.id ? replyText : ''}
-                                                                onChange={(e) => {
-                                                                    setSelectedRequest(request.id);
-                                                                    setReplyText(e.target.value);
-                                                                }}
-                                                            />
-                                                            <button
-                                                                className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-                                                                onClick={() => handleMaintenanceReply(request.id, replyText)}
-                                                                disabled={loading || !replyText.trim()}
-                                                            >
-                                                                Send Reply
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                {activeTab === 'maintenance' && (
+                    <div className="space-y-6">
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+                            
+                            {maintenanceRequests.map((request) => (
+                                <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="font-medium">{request.title}</h4>
+                                            <p className="text-sm text-gray-500">
+                                                Submitted by: {request.userName} | Location: {request.location}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                Priority: {request.priority} | Status: {request.status}
+                                            </p>
+                                        </div>
+                                        <select
+                                            className="text-sm border rounded-md p-1"
+                                            value={request.status}
+                                            onChange={(e) => handleMaintenanceStatusChange(request.id, e.target.value)}
+                                            disabled={loading}
+                                        >
+                                            <option value="Pending">Pending</option>
+                                            <option value="In Progress">In Progress</option>
+                                            <option value="Completed">Completed</option>
+                                            <option value="Cancelled">Cancelled</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <p className="text-gray-700">{request.description}</p>
+                                    
+                                    {request.comments && request.comments.length > 0 && (
+                                        <div className="mt-3 space-y-2">
+                                            <h5 className="font-medium">Comments:</h5>
+                                            {request.comments.map((comment, index) => (
+                                                <div key={index} className="bg-gray-50 p-2 rounded">
+                                                    <p className="text-sm">{comment.content}</p>
+                                                    <p className="text-xs text-gray-500">
+                                                        {comment.isAdminReply ? 'Admin Reply' : 'User Comment'} - {' '}
+                                                        {comment.createdAt?.toDate().toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
+                                    
+                                    <div className="mt-3">
+                                        <textarea
+                                            className="w-full border rounded-md p-2 text-sm"
+                                            placeholder="Write a reply..."
+                                            value={selectedRequest === request.id ? replyText : ''}
+                                            onChange={(e) => {
+                                                setSelectedRequest(request.id);
+                                                setReplyText(e.target.value);
+                                            }}
+                                        />
+                                        <button
+                                            className="mt-2 bg-blue-600 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                                            onClick={() => handleMaintenanceReply(request.id, replyText)}
+                                            disabled={loading || !replyText.trim()}
+                                        >
+                                            Send Reply
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
+                            ))}
+                               
+                        </div>
+                    </div>
+                )}
+                 {activeTab === 'contacts' && (
+                 <div className="space-y-6">
+                   {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                    <p className="text-red-700">{error}</p>
+                </div>
+                )}
+     
+                {success && (
+                <div className="bg-green-50 border-l-4 border-green-500 p-4">
+                    <p className="text-green-700">{success}</p>
+                </div>
+                )}
+     
+                 {/* Rest of the component remains the same */}
+                 <div className="bg-white shadow rounded-lg p-6">
+                     <h3 className="text-xl font-semibold mb-4">Add New Contact</h3>
+                     <form onSubmit={handleAddContact} className="space-y-4">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <input
+                                 type="text"
+                                 placeholder="Name"
+                                 className="border rounded-md p-2"
+                                 value={newContact.name}
+                                 onChange={(e) => setNewContact({...newContact, name: e.target.value})}
+                                 required
+                             />
+                             <input
+                                 type="text"
+                                 placeholder="Role"
+                                 className="border rounded-md p-2"
+                                 value={newContact.role}
+                                 onChange={(e) => setNewContact({...newContact, role: e.target.value})}
+                                 required
+                             />
+                             <input
+                                 type="email"
+                                 placeholder="Email"
+                                 className="border rounded-md p-2"
+                                 value={newContact.email}
+                                 onChange={(e) => setNewContact({...newContact, email: e.target.value})}
+                                 required
+                             />
+                             <input
+                                 type="tel"
+                                 placeholder="Phone"
+                                 className="border rounded-md p-2"
+                                 value={newContact.phone}
+                                 onChange={(e) => setNewContact({...newContact, phone: e.target.value})}
+                                 required
+                             />
+                          
+                         </div>
+                         <button
+                             type="submit"
+                             disabled={loading}
+                             className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                             {loading ? 'Adding...' : 'Add Contact'}
+                         </button>
+                     </form>
+                 </div>
+     
+                 {/* Contact list section remains the same */}
+                 <div className="bg-white shadow rounded-lg p-6">
+                     <h3 className="text-xl font-semibold mb-4">Contact List</h3>
+                     <div className="space-y-4">
+                         {contacts.map((contact) => (
+                             <div key={contact.id} className="border rounded-lg p-4">
+                                 {editingContact?.id === contact.id ? (
+                                     <div className="space-y-4">
+                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                             <input
+                                                 type="text"
+                                                 className="border rounded-md p-2"
+                                                 value={editingContact.name}
+                                                 onChange={(e) => setEditingContact({
+                                                     ...editingContact,
+                                                     name: e.target.value
+                                                 })}
+                                             />
+                                             <input
+                                                 type="text"
+                                                 className="border rounded-md p-2"
+                                                 value={editingContact.role}
+                                                 onChange={(e) => setEditingContact({
+                                                     ...editingContact,
+                                                     role: e.target.value
+                                                 })}
+                                             />
+                                             <input
+                                                 type="email"
+                                                 className="border rounded-md p-2"
+                                                 value={editingContact.email}
+                                                 onChange={(e) => setEditingContact({
+                                                     ...editingContact,
+                                                     email: e.target.value
+                                                 })}
+                                             />
+                                             <input
+                                                 type="tel"
+                                                 className="border rounded-md p-2"
+                                                 value={editingContact.phone}
+                                                 onChange={(e) => setEditingContact({
+                                                     ...editingContact,
+                                                     phone: e.target.value
+                                                 })}
+                                             />
+                                            
+                                         </div>
+                                         <div className="flex space-x-2">
+                                             <button
+                                                 onClick={() => handleUpdateContact(contact.id)}
+                                                 className="flex items-center space-x-1 bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700"
+                                             >
+                                                 <Save className="h-4 w-4" />
+                                                 <span>Save</span>
+                                             </button>
+                                             <button
+                                                 onClick={() => setEditingContact(null)}
+                                                 className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-md hover:bg-gray-700"
+                                             >
+                                                 <X className="h-4 w-4" />
+                                                 <span>Cancel</span>
+                                             </button>
+                                         </div>
+                                     </div>
+                                 ) : (
+                                     <div>
+                                         <div className="flex justify-between items-start">
+                                             <div>
+                                                 <h4 className="font-medium">{contact.name}</h4>
+                                                 <p className="text-sm text-gray-600">{contact.role}</p>
+                                                 
+                                                 <p className="text-sm text-gray-600">{contact.email}</p>
+                                                 <p className="text-sm text-gray-600">{contact.phone}</p>
+                                             </div>
+                                             <div className="flex space-x-2">
+                                                 <button
+                                                     onClick={() => setEditingContact(contact)}
+                                                     className="text-blue-600 hover:text-blue-800"
+                                                 >
+                                                     <Edit2 className="h-5 w-5" />
+                                                 </button>
+                                                 <button
+                                                     onClick={() => handleDeleteContact(contact.id)}
+                                                     className="text-red-600 hover:text-red-800"
+                                                 >
+                                                     <Trash2 className="h-5 w-5" />
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     </div>
+                                 )}
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+             </div>
+                )}
+                </div>
+            </div>
+        </div>
     );
 };
 

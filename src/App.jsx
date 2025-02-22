@@ -7,6 +7,7 @@ import UserDashboard from './components/UserDashboard.jsx';
 import MaintenanceRequest from './components/MaintenanceRequest.jsx';
 import Booking from './components/Booking.jsx';
 import CommunityForum from './components/CommunityForum.jsx';
+import ContactManagement from './components/contactManagement.jsx';
 
 // ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -51,6 +52,7 @@ const App = () => {
                             </ProtectedRoute>
                         }
                     />
+                  
 
                     {/* User routes */}
                     <Route
@@ -69,6 +71,7 @@ const App = () => {
                             </ProtectedRoute>
                         }
                     />
+                    
 
                     {/* Root redirect */}
                     <Route path="/" element={<Navigate to="/login" />} />
@@ -103,7 +106,16 @@ const App = () => {
                         </ProtectedRoute>
                     }
                 />
+                 <Route
+                        path="/user/community"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <ContactManagement />
+                            </ProtectedRoute>
+                        }
+                    />
                 </Routes>
+
             </Router>
         </AuthProvider>
     );

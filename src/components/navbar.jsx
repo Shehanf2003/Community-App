@@ -40,11 +40,11 @@ const Navbar = () => {
     <nav className="bg-blue-600">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex justify-between h-16">
-          {/* Left side - Logo and brand */}
+          
           <div className="flex items-center">
             <div className="flex-shrink-0 flex items-center space-x-2">
               <img 
-                src="/public/cu1.png" 
+                src="/cu1.png" 
                 alt="CU Logo" 
                 className="h-8 w-8"
               />
@@ -52,7 +52,7 @@ const Navbar = () => {
             </div>
           </div>
 
-          {/* Center - Navigation Links */}
+          
           <div className="hidden md:flex items-center justify-center flex-1 ml-8">
             <div className="flex space-x-4">
               <Link
@@ -79,10 +79,16 @@ const Navbar = () => {
               >
                 Community Forum
               </Link>
+              <Link
+                  to={`${basePath}/community`}
+                  className={`${isActiveRoute(`${basePath}/community`)} text-white px-3 py-2 text-sm font-medium hover:bg-blue-700 rounded-md`}
+              >
+                  Community Directory
+              </Link>
             </div>
           </div>
 
-          {/* Right side - Notifications and Username */}
+          
           <div className="flex items-center space-x-4">
             <div className="relative">
               <Notifications />
@@ -122,6 +128,12 @@ const Navbar = () => {
             >
               Community Forum
             </Link>
+            <Link
+              to={`${basePath}/community`}
+              className={`${isActiveRoute(`${basePath}/community`)} text-white block px-3 py-2 rounded-md text-base font-medium hover:bg-blue-700`}
+          >
+              Community Directory
+          </Link>
           </div>
         </div>
       </div>
