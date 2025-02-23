@@ -10,28 +10,24 @@ import {
     onSnapshot,
     doc,
     updateDoc,
-    and,
-    or,
-    arrayUnion
+    getDoc,
+    Timestamp
 } from 'firebase/firestore';
 
 const Notifications = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [notifications, setNotifications] = useState([]);
-    const [viewedNotifications, setViewedNotifications] = useState(new Set());
+    const [unreadCount, setUnreadCount] = useState(0);
     const { currentUser } = useAuth();
     const db = getFirestore();
 
     useEffect(() => {
         if (!currentUser?.uid) return;
 
-        // Create queries for both personal notifications and announcements
         const personalQuery = query(
             collection(db, 'notifications'),
-            and(
-                where('userId', '==', currentUser.uid),
-                where('read', '==', false)
-            ),
+            where('userId', '==', currentUser.uid),
+            where('read', '==', false),
             orderBy('createdAt', 'desc')
         );
 
@@ -40,21 +36,15 @@ const Notifications = () => {
             orderBy('createdAt', 'desc')
         );
 
-        // Subscribe to personal notifications
         const unsubscribePersonal = onSnapshot(personalQuery, (snapshot) => {
             const personalNotifications = snapshot.docs.map(doc => ({
                 id: doc.id,
                 type: doc.data().type,
                 ...doc.data()
             }));
-            setNotifications(currentNotifications => {
-                const announcements = currentNotifications.filter(n => n.isAnnouncement);
-                return [...personalNotifications, ...announcements].sort((a, b) => 
-                    b.createdAt?.toDate?.() - a.createdAt?.toDate?.());
-            });
+            updateNotificationsAndCount(personalNotifications, 'personal');
         });
 
-        // Subscribe to announcements
         const unsubscribeAnnouncements = onSnapshot(announcementQuery, (snapshot) => {
             const announcements = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -65,11 +55,7 @@ const Notifications = () => {
                 read: doc.data().read?.[currentUser.uid] || false
             })).filter(announcement => !announcement.read);
 
-            setNotifications(currentNotifications => {
-                const personal = currentNotifications.filter(n => !n.isAnnouncement);
-                return [...personal, ...announcements].sort((a, b) => 
-                    b.createdAt?.toDate?.() - a.createdAt?.toDate?.());
-            });
+            updateNotificationsAndCount(announcements, 'announcement');
         });
 
         return () => {
@@ -78,59 +64,75 @@ const Notifications = () => {
         };
     }, [currentUser]);
 
+    const updateNotificationsAndCount = (newNotifications, type) => {
+        setNotifications(currentNotifications => {
+            const otherTypes = currentNotifications.filter(n => 
+                type === 'personal' ? n.isAnnouncement : !n.isAnnouncement
+            );
+            const merged = [...otherTypes, ...newNotifications].sort((a, b) => 
+                b.createdAt?.toDate?.() - a.createdAt?.toDate?.()
+            );
+            setUnreadCount(merged.length);
+            return merged;
+        });
+    };
+
     const markAsRead = async (notification) => {
-        if (notification.isAnnouncement) {
-            const announcementRef = doc(db, 'announcements', notification.id);
-            await updateDoc(announcementRef, {
-                [`read.${currentUser.uid}`]: true
+        try {
+            if (notification.isAnnouncement) {
+                const announcementRef = doc(db, 'announcements', notification.id);
+                // First get the current document to preserve existing read states
+                const announcementDoc = await getDoc(announcementRef);
+                const currentRead = announcementDoc.data()?.read || {};
+                
+                await updateDoc(announcementRef, {
+                    read: {
+                        ...currentRead,
+                        [currentUser.uid]: true
+                    }
+                });
+            } else {
+                const notificationRef = doc(db, 'notifications', notification.id);
+                await updateDoc(notificationRef, {
+                    read: true,
+                    viewedAt: Timestamp.now()
+                });
+            }
+    
+            // Update local state immediately
+            setNotifications(currentNotifications => {
+                const filtered = currentNotifications.filter(n => n.id !== notification.id);
+                setUnreadCount(filtered.length);
+                return filtered;
             });
-        } else {
-            const notificationRef = doc(db, 'notifications', notification.id);
-            await updateDoc(notificationRef, {
-                read: true
-            });
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
         }
     };
 
     const handleBellClick = () => {
-        if (!isExpanded) {
-            const newViewedNotifications = new Set(notifications.map(n => n.id));
-            setViewedNotifications(newViewedNotifications);
-        }
         setIsExpanded(!isExpanded);
     };
-
-    const unviewedCount = notifications.filter(n => !viewedNotifications.has(n.id)).length;
 
     const renderNotificationContent = (notification) => {
         switch (notification.type) {
             case 'announcement':
                 return (
-                    <>
-                        <p className="font-medium text-sm">
-                            New Announcement
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {notification.content}
-                        </p>
-                    </>
+                    <div className="flex flex-col">
+                        <p className="font-medium text-sm">New Announcement</p>
+                        <p className="text-sm text-gray-600 mt-1">{notification.content}</p>
+                    </div>
                 );
             case 'maintenance_reply':
                 return (
-                    <>
-                        <p className="font-medium text-sm">
-                            Maintenance Request: {notification.maintenanceTitle}
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {notification.content}
-                        </p>
-                    </>
+                    <div className="flex flex-col">
+                        <p className="font-medium text-sm">Maintenance Request: {notification.maintenanceTitle}</p>
+                        <p className="text-sm text-gray-600 mt-1">{notification.content}</p>
+                    </div>
                 );
             default:
                 return (
-                    <p className="text-sm text-gray-600">
-                        {notification.content}
-                    </p>
+                    <p className="text-sm text-gray-600">{notification.content}</p>
                 );
         }
     };
@@ -142,9 +144,9 @@ const Notifications = () => {
                 className="p-2 rounded-full hover:bg-gray-100 relative"
             >
                 <Bell className="w-6 h-6 text-gray-700" />
-                {unviewedCount > 0 && (
-                    <span className="absolute top-0 right-0 bg-red-500 text-white text-xs w-4 h-4 flex items-center justify-center rounded-full">
-                        {unviewedCount}
+                {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                 )}
             </button>
@@ -154,7 +156,6 @@ const Notifications = () => {
                     <div className="flex items-center justify-between p-4 border-b">
                         <h2 className="text-lg font-semibold">Notifications</h2>
                     </div>
-
                     <div className="p-4 max-h-96 overflow-y-auto">
                         {notifications.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-8 text-gray-500">
@@ -165,7 +166,7 @@ const Notifications = () => {
                             notifications.map(notification => (
                                 <div
                                     key={notification.id}
-                                    className="p-3 hover:bg-gray-50 border-b cursor-pointer"
+                                    className="p-3 hover:bg-gray-50 border-b cursor-pointer transition-colors duration-200"
                                     onClick={() => markAsRead(notification)}
                                 >
                                     {renderNotificationContent(notification)}
@@ -176,12 +177,6 @@ const Notifications = () => {
                             ))
                         )}
                     </div>
-
-                    <div className="border-t p-3">
-                        <button className="w-full text-sm text-blue-600 hover:text-blue-700 text-right">
-                            See all
-                        </button>
-                    </div>
                 </div>
             )}
         </div>
@@ -189,3 +184,4 @@ const Notifications = () => {
 };
 
 export default Notifications;
+

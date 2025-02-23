@@ -38,7 +38,7 @@ const AdminDashboard = () => {
     
     
 
-    const { currentUser } = useAuth();
+    const { currentUser,logout } = useAuth();
     const auth = getAuth();
     const db = getFirestore();
     
@@ -365,12 +365,28 @@ const AdminDashboard = () => {
             setIsSubmitting(false);
         }
     };
+    const handleLogout = async () => {
+        try {
+          await logout();
+          navigate('/login');
+        } catch (error) {
+          console.error('Failed to logout:', error);
+        }
+      }
 
     return (
         <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto">
-                <div className="bg-white shadow rounded-lg p-6">
-                    <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Admin Dashboard</h2>
+                <button
+                    onClick={handleLogout}
+                    className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium"
+                >
+                    Logout
+                </button>
+            
+                </div>           
 
                     {error && (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
@@ -819,7 +835,8 @@ const AdminDashboard = () => {
                 )}
                 </div>
             </div>
-        </div>
+       
+
     );
 };
 

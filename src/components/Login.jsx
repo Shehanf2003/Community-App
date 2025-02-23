@@ -31,7 +31,7 @@ const Login = () => {
                 <div className="text-center">
                     <h1 className="text-[#1877f2] text-6xl font-bold mb-4">CommUnity</h1>
                     <p className="text-xl text-gray-700 mb-8">
-                        Connect with friends and the world around you on Facebook.
+                    "Connecting Neighbors, Building Community, Simplifying Living—Together, We Thrive!"
                     </p>
                 </div>
 

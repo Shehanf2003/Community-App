@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // import useAuth hook
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import Notifications from './notifications';
 
 const Navbar = () => {
-  const { currentUser, userRole } = useAuth();
+  const { currentUser, userRole, logout } = useAuth(); // Destructure logout here
   const location = useLocation();
+  const navigate = useNavigate(); // Add useNavigate hook
   const [username, setUsername] = useState('');
 
   useEffect(() => {
@@ -27,6 +28,15 @@ const Navbar = () => {
 
     fetchUsername();
   }, [currentUser]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Failed to logout:', error);
+    }
+  }
 
   const isActiveRoute = (route) => {
     return location.pathname === route ? 'bg-blue-700' : '';
@@ -97,6 +107,13 @@ const Navbar = () => {
               <span className="text-white text-sm">
                 Welcome, {username || 'User'}
               </span>
+              <button
+                onClick={handleLogout}
+                className="bg-blue-700 hover:bg-blue-800 text-white px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Logout
+              </button>
+
             </div>
           </div>
         </div>

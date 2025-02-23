@@ -6,7 +6,6 @@ import Navbar from './navbar';
 
 const UserDashboard = () => {
     const [announcements, setAnnouncements] = useState([]);
-    const [unreadCount, setUnreadCount] = useState(0);
     const { currentUser } = useAuth();
 
     useEffect(() => {
@@ -20,25 +19,34 @@ const UserDashboard = () => {
             const announcementsList = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                isUnread: !doc.data().read?.[currentUser.uid]
+                isNew: !doc.data().viewed?.[currentUser.uid]
             }));
 
             setAnnouncements(announcementsList);
-            setUnreadCount(announcementsList.filter(a => a.isUnread).length);
         } catch (err) {
             console.error('Error fetching announcements:', err);
         }
     };
 
-    const markAsRead = async (announcementId) => {
+    const markAsViewed = async (announcementId) => {
         try {
             const announcementRef = doc(db, 'announcements', announcementId);
+            
+            // Update the viewed status in Firestore
             await updateDoc(announcementRef, {
-                [`read.${currentUser.uid}`]: true
+                [`viewed.${currentUser.uid}`]: true
             });
-            fetchAnnouncements();
+            
+            // Update local state to reflect the change
+            setAnnouncements(prev => 
+                prev.map(announcement => 
+                    announcement.id === announcementId 
+                        ? { ...announcement, isNew: false }
+                        : announcement
+                )
+            );
         } catch (err) {
-            console.error('Error marking announcement as read:', err);
+            console.error('Error marking announcement as viewed:', err);
         }
     };
 
@@ -48,24 +56,22 @@ const UserDashboard = () => {
             <div className="py-6 px-4 sm:px-6 lg:px-8">
                 <div className="max-w-4xl mx-auto">
                     <div className="bg-white shadow rounded-lg p-6">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-bold">Announcements</h2>
-                            {unreadCount > 0 && (
-                                <span className="bg-red-500 text-white px-3 py-1 rounded-full text-sm">
-                                    {unreadCount} new
-                                </span>
-                            )}
-                        </div>
+                        <h2 className="text-2xl font-bold mb-6">Announcements</h2>
 
                         <div className="space-y-6">
                             {announcements.map((announcement) => (
                                 <div
                                     key={announcement.id}
-                                    className={`border rounded-lg p-4 ${announcement.isUnread ? 'bg-blue-50' : ''}`}
+                                    className={`border rounded-lg p-4 ${announcement.isNew ? 'bg-blue-50' : ''}`}
                                 >
                                     <div className="flex justify-between items-start">
                                         <div className="flex-grow">
-                                            <p className="text-gray-900 mb-2">{announcement.content}</p>
+                                            <p className={`text-gray-900 mb-2 ${announcement.isNew ? 'font-bold' : 'font-normal'}`}>
+                                                {announcement.content}
+                                                {announcement.isNew && (
+                                                    <span className="ml-2 text-sm text-red-500">New</span>
+                                                )}
+                                            </p>
                                             {announcement.imageUrl && (
                                                 <img
                                                     src={announcement.imageUrl}
@@ -77,9 +83,9 @@ const UserDashboard = () => {
                                                 Posted on {announcement.createdAt?.toDate().toLocaleDateString()}
                                             </p>
                                         </div>
-                                        {announcement.isUnread && (
+                                        {announcement.isNew && (
                                             <button
-                                                onClick={() => markAsRead(announcement.id)}
+                                                onClick={() => markAsViewed(announcement.id)}
                                                 className="ml-4 text-sm text-blue-600 hover:text-blue-800"
                                             >
                                                 Mark as read
