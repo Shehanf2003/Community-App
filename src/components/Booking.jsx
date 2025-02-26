@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, addDoc, deleteDoc, doc, Timestamp, getDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import Navbar from './navbar';
+
 
 const ResourceBooking = () => {
   const { currentUser } = useAuth();
@@ -215,7 +215,7 @@ const ResourceBooking = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+     
       <div className="max-w-4xl mx-auto p-4">
         <h2 className="text-2xl font-bold mb-4">Resource Booking</h2>
         

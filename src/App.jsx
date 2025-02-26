@@ -8,6 +8,7 @@ import MaintenanceRequest from './components/MaintenanceRequest.jsx';
 import Booking from './components/Booking.jsx';
 import CommunityForum from './components/CommunityForum.jsx';
 import ContactManagement from './components/contactManagement.jsx';
+import Navbar from './components/navbar.jsx';
 
 // ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
@@ -30,6 +31,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
 const App = () => {
     return (
+        
         <AuthProvider>
             <Router>
                 <Routes>
@@ -40,7 +42,7 @@ const App = () => {
                         path="/admin"
                         element={
                             <ProtectedRoute requiredRole="admin">
-                                <AdminDashboard />
+                             <AdminDashboard />
                             </ProtectedRoute>
                         }
                     />
@@ -48,17 +50,18 @@ const App = () => {
                         path="/admin/maintenance"
                         element={
                             <ProtectedRoute requiredRole="admin">
+                                <Navbar />
                                 <MaintenanceRequest />
                             </ProtectedRoute>
                         }
                     />
-                  
-
+                
                     {/* User routes */}
                     <Route
                         path="/user"
                         element={
                             <ProtectedRoute requiredRole="user">
+                                <Navbar />
                                 <UserDashboard />
                             </ProtectedRoute>
                         }
@@ -67,12 +70,12 @@ const App = () => {
                         path="/user/maintenance"
                         element={
                             <ProtectedRoute requiredRole="user">
+                                <Navbar />
                                 <MaintenanceRequest />
                             </ProtectedRoute>
                         }
                     />
                     
-
                     {/* Root redirect */}
                     <Route path="/" element={<Navigate to="/login" />} />
                     
@@ -90,34 +93,37 @@ const App = () => {
                             </ProtectedRoute>
                         } 
                     />
-                     <Route
+                    <Route
                         path="/user/resources"
                         element={
                             <ProtectedRoute requiredRole="user">
+                                <Navbar />
                                 <Booking />
                             </ProtectedRoute>
                         }
                     />
                     <Route
-                    path="/user/forum"
-                    element={
-                        <ProtectedRoute requiredRole="user">
-                            <CommunityForum />
-                        </ProtectedRoute>
-                    }
-                />
-                 <Route
+                        path="/user/forum"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <Navbar />
+                                <CommunityForum />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
                         path="/user/community"
                         element={
                             <ProtectedRoute requiredRole="user">
+                                <Navbar />
                                 <ContactManagement />
                             </ProtectedRoute>
                         }
                     />
                 </Routes>
-
             </Router>
         </AuthProvider>
+            
     );
 };
 
