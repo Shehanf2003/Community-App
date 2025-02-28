@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-import Navbar from './navbar';
+
 
 const UserDashboard = () => {
     const [announcements, setAnnouncements] = useState([]);
@@ -19,7 +19,7 @@ const UserDashboard = () => {
             const announcementsList = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                isNew: !doc.data().viewed?.[currentUser.uid]
+                isNew: !doc.data().read?.[currentUser.uid]
             }));
 
             setAnnouncements(announcementsList);
@@ -32,9 +32,9 @@ const UserDashboard = () => {
         try {
             const announcementRef = doc(db, 'announcements', announcementId);
             
-            // Update the viewed status in Firestore
+            // Update to use 'read' instead of 'viewed' to match security rules
             await updateDoc(announcementRef, {
-                [`viewed.${currentUser.uid}`]: true
+                [`read.${currentUser.uid}`]: true
             });
             
             // Update local state to reflect the change

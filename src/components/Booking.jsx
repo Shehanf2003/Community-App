@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, getDocs, addDoc, deleteDoc, doc, Timestamp, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, deleteDoc, doc, Timestamp, getDoc, orderBy, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
-
 
 const ResourceBooking = () => {
   const { currentUser } = useAuth();
@@ -16,6 +15,8 @@ const ResourceBooking = () => {
   const [userBookings, setUserBookings] = useState([]);
   const [allBookings, setAllBookings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
+  const [timeSlotLoading, setTimeSlotLoading] = useState(false);
 
   // Hardcoded resources
   const resources = [
@@ -31,6 +32,13 @@ const ResourceBooking = () => {
     const cleanup = setupBookingCleanup();
     return () => cleanup();
   }, [currentUser]);
+
+  // Update available time slots whenever resource or date changes
+  useEffect(() => {
+    if (selectedResource && bookingDate) {
+      checkAvailableTimeSlots();
+    }
+  }, [selectedResource, bookingDate]);
 
   const fetchUserBookings = async () => {
     try {
@@ -96,6 +104,70 @@ const ResourceBooking = () => {
     return () => clearInterval(interval);
   };
 
+  // Check for available time slots on the selected date
+  const checkAvailableTimeSlots = async () => {
+    if (!selectedResource || !bookingDate) return;
+    
+    setTimeSlotLoading(true);
+    
+    try {
+      // Create date range for the selected date (midnight to midnight)
+      const startOfDay = new Date(`${bookingDate}T00:00:00`);
+      const endOfDay = new Date(`${bookingDate}T23:59:59`);
+      
+      // Get all bookings for this resource and date
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        where('resourceId', '==', selectedResource),
+        where('startTime', '>=', Timestamp.fromDate(startOfDay)),
+        where('startTime', '<=', Timestamp.fromDate(endOfDay))
+      );
+      
+      const snapshot = await getDocs(q);
+      const dayBookings = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          startTime: data.startTime.toDate(),
+          endTime: data.endTime.toDate()
+        };
+      });
+      
+      // Generate available time slots (hourly from 8AM to 8PM)
+      const slots = [];
+      const businessHoursStart = 8; // 8AM
+      const businessHoursEnd = 20; // 8PM
+      
+      for (let hour = businessHoursStart; hour < businessHoursEnd; hour++) {
+        const slotStart = new Date(`${bookingDate}T${hour.toString().padStart(2, '0')}:00:00`);
+        const slotEnd = new Date(slotStart);
+        slotEnd.setHours(slotEnd.getHours() + parseInt(duration));
+        
+        // Skip past slots
+        if (slotEnd <= new Date()) continue;
+        
+        // Check if this slot conflicts with any existing bookings
+        const isAvailable = !dayBookings.some(booking => {
+          return (slotStart < booking.endTime && slotEnd > booking.startTime);
+        });
+        
+        if (isAvailable) {
+          slots.push({
+            time: hour.toString().padStart(2, '0') + ":00",
+            available: true
+          });
+        }
+      }
+      
+      setAvailableTimeSlots(slots);
+      setTimeSlotLoading(false);
+    } catch (error) {
+      console.error('Error checking available time slots:', error);
+      setTimeSlotLoading(false);
+    }
+  };
+
   const handleBooking = async () => {
     if (!selectedResource || !bookingDate || !bookingTime || !purpose || !attendees) {
       alert('Please fill in all required fields');
@@ -112,51 +184,58 @@ const ResourceBooking = () => {
     }
 
     try {
-      // Check for conflicting bookings
-      const bookingsRef = collection(db, 'bookings');
-      const q = query(
-        bookingsRef,
-        where('resourceId', '==', selectedResource),
-        where('startTime', '<=', Timestamp.fromDate(endTime)),
-        where('endTime', '>=', Timestamp.fromDate(bookingDateTime))
-      );
-      const conflictingBookings = await getDocs(q);
+      // Use a transaction to ensure no double-booking occurs
+      await runTransaction(db, async (transaction) => {
+        // Check for conflicting bookings
+        const bookingsRef = collection(db, 'bookings');
+        const q = query(
+          bookingsRef,
+          where('resourceId', '==', selectedResource),
+          where('startTime', '<=', Timestamp.fromDate(endTime)),
+          where('endTime', '>=', Timestamp.fromDate(bookingDateTime))
+        );
+        
+        const conflictingBookingsSnapshot = await getDocs(q);
+        
+        if (!conflictingBookingsSnapshot.empty) {
+          throw new Error('This time slot is already booked');
+        }
 
-      if (!conflictingBookings.empty) {
-        alert('This time slot is already booked');
-        return;
-      }
+        // Get resource details from hardcoded list
+        const resourceData = resources.find(r => r.id === selectedResource);
+        
+        if (!resourceData) {
+          throw new Error('Resource not found');
+        }
 
-      // Get resource details from hardcoded list
-      const resourceData = resources.find(r => r.id === selectedResource);
-      
-      if (!resourceData) {
-        alert('Resource not found');
-        return;
-      }
+        // Validate attendees against capacity
+        if (parseInt(attendees) > resourceData.capacity) {
+          throw new Error(`Maximum capacity for this resource is ${resourceData.capacity} people`);
+        }
 
-      // Validate attendees against capacity
-      if (parseInt(attendees) > resourceData.capacity) {
-        alert(`Maximum capacity for this resource is ${resourceData.capacity} people`);
-        return;
-      }
-
-      // Create new booking
-      await addDoc(collection(db, 'bookings'), {
-        resourceId: selectedResource,
-        resourceName: resourceData.name,
-        userId: currentUser.uid,
-        userName: currentUser.displayName || currentUser.email,  // Include user name for display
-        startTime: Timestamp.fromDate(bookingDateTime),
-        endTime: Timestamp.fromDate(endTime),
-        purpose: purpose,
-        attendees: parseInt(attendees),
-        createdAt: Timestamp.now()
+        // Create new booking document reference
+        const newBookingRef = doc(collection(db, 'bookings'));
+        
+        // Set the booking data within the transaction
+        transaction.set(newBookingRef, {
+          resourceId: selectedResource,
+          resourceName: resourceData.name,
+          userId: currentUser.uid,
+          userName: currentUser.displayName || currentUser.email,
+          startTime: Timestamp.fromDate(bookingDateTime),
+          endTime: Timestamp.fromDate(endTime),
+          purpose: purpose,
+          attendees: parseInt(attendees),
+          createdAt: Timestamp.now()
+        });
+        
+        return newBookingRef;
       });
 
       alert('Booking successful!');
       fetchUserBookings();
       fetchAllBookings();
+      checkAvailableTimeSlots(); // Refresh available slots
       resetForm();
     } catch (error) {
       console.error('Error creating booking:', error);
@@ -168,6 +247,15 @@ const ResourceBooking = () => {
     setSelectedResource(resourceId);
     const resourceDetails = resources.find(r => r.id === resourceId);
     setSelectedResourceDetails(resourceDetails || null);
+    setBookingTime(''); // Reset time when resource changes
+    if (bookingDate) {
+      checkAvailableTimeSlots();
+    }
+  };
+  
+  const handleDateChange = (date) => {
+    setBookingDate(date);
+    setBookingTime(''); // Reset time when date changes
   };
   
   const resetForm = () => {
@@ -178,6 +266,7 @@ const ResourceBooking = () => {
     setDuration(2);
     setPurpose('');
     setAttendees('');
+    setAvailableTimeSlots([]);
   };
 
   const handleCancelBooking = async (bookingId) => {
@@ -203,6 +292,7 @@ const ResourceBooking = () => {
       alert('Booking cancelled successfully');
       fetchUserBookings();
       fetchAllBookings();
+      checkAvailableTimeSlots(); // Refresh available slots
     } catch (error) {
       console.error('Error cancelling booking:', error);
       alert('Error cancelling booking: ' + error.message);
@@ -274,26 +364,48 @@ const ResourceBooking = () => {
                 type="date"
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={bookingDate}
-                onChange={(e) => setBookingDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
               />
             </div>
             
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Time</label>
-              <input
-                type="time"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                value={bookingTime}
-                onChange={(e) => setBookingTime(e.target.value)}
-              />
-            </div>
+            {bookingDate && selectedResource && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Available Time Slots</label>
+                {timeSlotLoading ? (
+                  <p className="text-sm text-gray-500 mt-2">Loading available slots...</p>
+                ) : availableTimeSlots.length > 0 ? (
+                  <div>
+                    <select
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={bookingTime}
+                      onChange={(e) => setBookingTime(e.target.value)}
+                    >
+                      <option value="">Select a time</option>
+                      {availableTimeSlots.map(slot => (
+                        <option key={slot.time} value={slot.time}>
+                          {slot.time} ({parseInt(duration)} hour{parseInt(duration) > 1 ? 's' : ''})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <p className="text-sm text-red-500 mt-2">No available time slots for this date with the selected duration</p>
+                )}
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Duration (hours)</label>
               <select
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={duration}
-                onChange={(e) => setDuration(e.target.value)}
+                onChange={(e) => {
+                  setDuration(e.target.value);
+                  // Refresh time slots when duration changes
+                  if (selectedResource && bookingDate) {
+                    setTimeout(() => checkAvailableTimeSlots(), 100);
+                  }
+                }}
               >
                 <option value="1">1 hour</option>
                 <option value="2">2 hours</option>
@@ -305,6 +417,7 @@ const ResourceBooking = () => {
             <button
               className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               onClick={handleBooking}
+              disabled={!selectedResource || !bookingDate || !bookingTime || !purpose || !attendees}
             >
               Book Resource
             </button>
