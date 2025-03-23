@@ -79,7 +79,7 @@ const UserDashboard = () => {
                                             onClick={() => markAsRead(announcement.id)}
                                             className="ml-4 text-sm text-blue-600 hover:text-blue-800"
                                         >
-                                            Mark as reads
+                                            Mark as read
                                         </button>
                                     )}
                                 </div>
