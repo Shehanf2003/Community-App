@@ -16,4 +16,20 @@ const ResourceBooking = () => {
     const [allBookings, setAllBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [availableTimeSlots, setAvailableTimeSlots] = useState([]);
-    const [timeSlotLoading, setTimeSlotLoading] = useState(false); }
+    const [timeSlotLoading, setTimeSlotLoading] = useState(false); 
+
+      // Hardcoded resources
+  const resources = [
+    { id: 'community-hall-1', name: 'Community Hall A', type: 'community_hall', capacity: 100 },
+    { id: 'outdoor-area-1', name: 'Outdoor Party Area', type: 'outdoor_party_area', capacity: 50 },
+    { id: 'meeting-room-1', name: 'Conference Room 1', type: 'meeting_room', capacity: 20 },
+    { id: 'meeting-room-2', name: 'Board Room', type: 'meeting_room', capacity: 12 }
+  ];
+
+  useEffect(() => {
+    fetchUserBookings();
+    fetchAllBookings();
+    const cleanup = setupBookingCleanup();
+    return () => cleanup();
+  }, [currentUser]);
+}

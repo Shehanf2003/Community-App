@@ -20,4 +20,35 @@ const UserDashboard = () => {
                 id: doc.id,
                 ...doc.data(),
                 isNew: !doc.data().viewed?.[currentUser.uid]
-            })); 
+            }));
+
+            setAnnouncements(announcementsList);
+        } catch (err) {
+            console.error('Error fetching announcements:', err);
+        }
+    };
+    const markAsViewed = async (announcementId) => {
+        try {
+            const announcementRef = doc(db, 'announcements', announcementId);
+            
+            // Update the viewed status in Firestore
+            await updateDoc(announcementRef, {
+                [`viewed.${currentUser.uid}`]: true
+            });
+            
+            // Update local state to reflect the change
+            setAnnouncements(prev => 
+                prev.map(announcement => 
+                    announcement.id === announcementId 
+                        ? { ...announcement, isNew: false }
+                        : announcement
+                )
+            );
+        } catch (err) {
+            console.error('Error marking announcement as viewed:', err);
+        }
+    };
+
+}
+
+export default UserDashboard;
