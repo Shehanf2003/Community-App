@@ -26,4 +26,38 @@ const ResourceBooking = () => {
     { id: 'meeting-room-2', name: 'Board Room', type: 'meeting_room', capacity: 12 }
   ];
 
+  useEffect(() => {
+    fetchUserBookings();
+    fetchAllBookings();
+    const cleanup = setupBookingCleanup();
+    return () => cleanup();
+  }, [currentUser]);
+
+  // Update available time slots whenever resource or date changes
+  useEffect(() => {
+    if (selectedResource && bookingDate) {
+      checkAvailableTimeSlots();
+    }
+  }, [selectedResource, bookingDate]);
+
+  const fetchUserBookings = async () => {
+    try {
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef, 
+        where('userId', '==', currentUser.uid),
+        orderBy('startTime', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      const bookingsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setUserBookings(bookingsList);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching user bookings:', error);
+      setLoading(false);
+    }
+  };
 }
