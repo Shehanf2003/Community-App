@@ -32,3 +32,4 @@ const ResourceBooking = () => {
     const cleanup = setupBookingCleanup();
     return () => cleanup();
   }, [currentUser]);
+}
