@@ -26,3 +26,13 @@ const ResourceBooking = () => {
     { id: 'meeting-room-2', name: 'Board Room', type: 'meeting_room', capacity: 12 }
   ];
 
+<<<<<<< HEAD
+=======
+  useEffect(() => {
+    fetchUserBookings();
+    fetchAllBookings();
+    const cleanup = setupBookingCleanup();
+    return () => cleanup();
+  }, [currentUser]);
+}
+>>>>>>> 2200b5622a85f36356741abc7fbe25d44dbc3e44
