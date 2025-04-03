@@ -60,4 +60,47 @@ const ResourceBooking = () => {
       setLoading(false);
     }
   };
+
+  const fetchAllBookings = async () => {
+    try {
+      const bookingsRef = collection(db, 'bookings');
+      const q = query(
+        bookingsRef,
+        orderBy('startTime', 'asc')
+      );
+      const snapshot = await getDocs(q);
+      const bookingsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        // Include a flag to determine if the current user owns this booking
+        isOwner: doc.data().userId === currentUser.uid
+      }));
+      setAllBookings(bookingsList);
+    } catch (error) {
+      console.error('Error fetching all bookings:', error);
+    }
+  };
+
+  const setupBookingCleanup = () => {
+    const interval = setInterval(async () => {
+      const now = new Date();
+      const bookingsRef = collection(db, 'bookings');
+      const snapshot = await getDocs(bookingsRef);
+      
+      snapshot.docs.forEach(async (bookingDoc) => {
+        const booking = bookingDoc.data();
+        const bookingEndTime = booking.endTime.toDate();
+        
+        if (bookingEndTime < now) {
+          await deleteDoc(doc(db, 'bookings', bookingDoc.id));
+        }
+      });
+      
+      // Refresh bookings after cleanup
+      fetchUserBookings();
+      fetchAllBookings();
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  };
 }
