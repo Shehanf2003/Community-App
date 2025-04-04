@@ -20,11 +20,24 @@ const UserDashboard = () => {
         try {
             const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
-            const announcementsList = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                isNew: !doc.data().read?.[currentUser.uid]
-            }));
+            
+            // Filter announcements client-side for visibility based on targeting
+            const announcementsList = querySnapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    isNew: !doc.data().read?.[currentUser.uid]
+                }))
+                .filter(announcement => {
+                    // Show announcement if:
+                    // 1. It's targeted to all users, or
+                    // 2. It's specifically targeted to this user
+                    return announcement.targetType === undefined || // Handle legacy announcements
+                           announcement.targetType === 'all' ||
+                           (announcement.targetType === 'specific' && 
+                            announcement.targetUsers && 
+                            announcement.targetUsers.includes(currentUser.uid));
+                });
 
             setAnnouncements(announcementsList);
         } catch (err) {
@@ -175,6 +188,9 @@ const UserDashboard = () => {
                                                         
                                                         <p className="text-sm text-gray-500 mt-2">
                                                             {formatDate(announcement.createdAt)}
+                                                            {announcement.targetType === 'specific' && announcement.targetUsers?.includes(currentUser.uid) && 
+                                                                <span className="ml-2 text-blue-600 font-medium">(Sent directly to you)</span>
+                                                            }
                                                         </p>
                                                     </div>
                                                     <div className="ml-4 flex-shrink-0 flex items-center">
