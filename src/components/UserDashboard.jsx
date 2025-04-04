@@ -64,4 +64,12 @@ return (
                                 key={announcement.id}
                                 className={`border rounded-lg p-4 ${announcement.isNew ? 'bg-blue-50' : ''}`}
                             >
+                                <div className="flex justify-between items-start">
+                                        <div className="flex-grow">
+                                            <p className={`text-gray-900 mb-2 ${announcement.isNew ? 'font-bold' : 'font-normal'}`}>
+                                                {announcement.content}
+                                                {announcement.isNew && (
+                                                    <span className="ml-2 text-sm text-red-500">New</span>
+                                                )}
+                                            </p>
 export default UserDashboard;
