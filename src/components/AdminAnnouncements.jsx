@@ -150,8 +150,6 @@ const Announcements = ({ currentUser }) => {
     };
 
     const fetchUsers = async () => {
-        if (!currentUser?.uid) return;
-        
         try {
             const querySnapshot = await getDocs(collection(db, 'users'));
             const usersList = querySnapshot.docs.map(doc => ({
@@ -159,7 +157,6 @@ const Announcements = ({ currentUser }) => {
                 ...doc.data()
             }));
             setUsers(usersList);
-            console.log('Fetched', usersList.length, 'users');
         } catch (err) {
             console.error('Error fetching users:', err);
             setError('Error loading users for targeting');
@@ -549,6 +546,50 @@ const Announcements = ({ currentUser }) => {
                                 )}
                                 
                                 <div className="mt-2 max-h-60 overflow-y-auto border border-gray-200 rounded-md">
+                                    {users.length === 0 ? (
+                                        <div className="flex justify-center items-center py-4">
+                                            <RefreshCw className="animate-spin h-5 w-5 text-indigo-500 mr-2" />
+                                            <span className="text-sm text-gray-500">Loading users...</span>
+                                        </div>
+                                    ) : (
+                                        users
+                                            .filter(user => 
+                                                (user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                !searchTerm)
+                                            )
+                                            .map(user => (
+                                                <div 
+                                                    key={user.id}
+                                                    className={`p-3 cursor-pointer border-b hover:bg-gray-50 flex items-center justify-between
+                                                    ${selectedUsers.includes(user.id) ? 'bg-indigo-50' : ''}`}
+                                                    onClick={() => handleUserSelection(user.id)}
+                                                >
+                                                    <div className="flex items-center">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedUsers.includes(user.id)}
+                                                            onChange={() => {}}
+                                                            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                                                        />
+                                                        <div className="ml-3">
+                                                            <div className="font-medium text-gray-900">
+                                                                {user.fullName || user.username || 'Unnamed User'}
+                                                            </div>
+                                                            {user.email && <div className="text-sm text-gray-500">{user.email}</div>}
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    {user.role === 'admin' && (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                                            Admin
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            ))
+                                    )}
+                                    
                                     {users.length > 0 && 
                                      users.filter(user => 
                                         user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -595,7 +636,7 @@ const Announcements = ({ currentUser }) => {
                         </div>
                     </form>
                 </div>
-            )}
+                )}
 
             {/* Announcement List */}
             <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
