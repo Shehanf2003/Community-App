@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
-import { Trash2, Edit2 } from "lucide-react";
+import { getAuth, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { Trash2, Edit2, AlertTriangle, CheckCircle, Search } from "lucide-react";
 
 const UserManagement = ({ currentUser }) => {
     const [email, setEmail] = useState('');
@@ -18,6 +18,9 @@ const UserManagement = ({ currentUser }) => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [userToDelete, setUserToDelete] = useState(null);
     const [serverStatus, setServerStatus] = useState('unknown');
+    const [assignedAddresses, setAssignedAddresses] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterRole, setFilterRole] = useState('all');
     
     // New states for edit functionality
     const [editMode, setEditMode] = useState(false);
@@ -88,6 +91,7 @@ const UserManagement = ({ currentUser }) => {
 
     const fetchUsers = async () => {
         try {
+            setLoading(true);
             const usersCollection = collection(db, 'users');
             const usersSnapshot = await getDocs(usersCollection);
             const usersList = usersSnapshot.docs.map(doc => ({
@@ -95,8 +99,14 @@ const UserManagement = ({ currentUser }) => {
                 ...doc.data()
             }));
             setUsers(usersList);
+            
+            // Extract assigned addresses
+            const addresses = usersList.map(user => user.address).filter(Boolean);
+            setAssignedAddresses(addresses);
         } catch (err) {
             setError('Error fetching users: ' + err.message);
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -138,18 +148,15 @@ const UserManagement = ({ currentUser }) => {
             }
 
             // Check if address is already assigned
-            const addressAssigned = usersSnapshot.docs.some(
-                doc => doc.data().address === address
-            );
-
-            if (addressAssigned) {
+            if (assignedAddresses.includes(address)) {
                 setError('This apartment address is already assigned to another user');
                 setLoading(false);
                 return;
             }
 
             // Create new user
-            const userCredential = await auth.createUserWithEmailAndPassword(
+            const userCredential = await createUserWithEmailAndPassword(
+                auth,
                 email,
                 password
             );
@@ -233,8 +240,8 @@ const UserManagement = ({ currentUser }) => {
 
             // Check if the new address is already assigned (excluding the current user)
             if (editAddress !== userToEdit.address) {
-                const addressAssigned = usersSnapshot.docs.some(
-                    doc => doc.id !== userToEdit.id && doc.data().address === editAddress
+                const addressAssigned = assignedAddresses.some(addr => 
+                    addr !== userToEdit.address && addr === editAddress
                 );
 
                 if (addressAssigned) {
@@ -499,10 +506,28 @@ const UserManagement = ({ currentUser }) => {
         }
     };
 
+    // Filter users based on search term and role
+    const filteredUsers = users.filter(user => {
+        const matchesSearch = 
+            (user.username && user.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (user.email && user.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (user.fullName && user.fullName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (user.address && user.address.toLowerCase().includes(searchTerm.toLowerCase()));
+        
+        const matchesRole = filterRole === 'all' || user.role === filterRole;
+        
+        return matchesSearch && matchesRole;
+    });
+
+    // Get available addresses (not already assigned)
+    const availableAddresses = apartmentAddresses.filter(addr => 
+        !assignedAddresses.includes(addr) || (userToEdit && addr === userToEdit.address)
+    );
+
     // Render edit form
     const renderEditForm = () => {
         return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                 <div className="bg-white rounded-lg p-6 max-w-xl w-full">
                     <h3 className="text-lg font-medium mb-4">Edit User</h3>
                     <form onSubmit={handleEditUser} className="space-y-4">
@@ -569,9 +594,17 @@ const UserManagement = ({ currentUser }) => {
                                 required
                             >
                                 <option value="">Select an apartment</option>
-                                {apartmentAddresses.map((apt, index) => (
-                                    <option key={index} value={apt}>{apt}</option>
-                                ))}
+                                {userToEdit && userToEdit.address && (
+                                    <option value={userToEdit.address}>
+                                        {userToEdit.address} (Current)
+                                    </option>
+                                )}
+                                {availableAddresses
+                                    .filter(addr => addr !== (userToEdit?.address || ''))
+                                    .map((apt, index) => (
+                                        <option key={index} value={apt}>{apt} (Available)</option>
+                                    ))
+                                }
                             </select>
                         </div>
 
@@ -611,15 +644,43 @@ const UserManagement = ({ currentUser }) => {
             
             {error && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                    {error}
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-5 w-5 mr-2" />
+                        <span>{error}</span>
+                    </div>
                 </div>
             )}
 
             {success && (
                 <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                    {success}
+                    <div className="flex items-center">
+                        <CheckCircle className="h-5 w-5 mr-2" />
+                        <span>{success}</span>
+                    </div>
                 </div>
             )}
+            
+            <div className="bg-white shadow rounded-lg p-6 mb-6">
+                <h3 className="text-xl font-semibold mb-4">Apartment Status Dashboard</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-blue-800 mb-2">Total Users</h4>
+                        <p className="text-2xl font-bold">{users.length}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-green-800 mb-2">Available Units</h4>
+                        <p className="text-2xl font-bold">{apartmentAddresses.length - assignedAddresses.length}</p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                        <h4 className="font-medium text-purple-800 mb-2">Occupancy Rate</h4>
+                        <p className="text-2xl font-bold">
+                            {apartmentAddresses.length === 0 
+                                ? '0%' 
+                                : Math.round((assignedAddresses.length / apartmentAddresses.length) * 100) + '%'}
+                        </p>
+                    </div>
+                </div>
+            </div>
             
             <div className="bg-gray-50 p-6 rounded-lg mb-6">
                 <h3 className="text-xl font-semibold mb-4">Register New User</h3>
@@ -702,17 +763,25 @@ const UserManagement = ({ currentUser }) => {
                                 required
                             >
                                 <option value="">Select an apartment</option>
-                                {apartmentAddresses.map((apt, index) => (
-                                    <option key={index} value={apt}>{apt}</option>
-                                ))}
+                                {apartmentAddresses
+                                    .filter(addr => !assignedAddresses.includes(addr))
+                                    .map((apt, index) => (
+                                        <option key={index} value={apt}>{apt} (Available)</option>
+                                    ))
+                                }
                             </select>
+                            {apartmentAddresses.filter(addr => !assignedAddresses.includes(addr)).length === 0 && (
+                                <p className="text-red-500 text-sm mt-1">
+                                    All apartments are currently assigned. Please free up an apartment first.
+                                </p>
+                            )}
                         </div>
                     </div>
 
                     <button
                         type="submit"
-                        disabled={loading}
-                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                        disabled={loading || apartmentAddresses.filter(addr => !assignedAddresses.includes(addr)).length === 0}
+                        className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
                     >
                         {loading ? 'Registering...' : 'Register User'}
                     </button>
@@ -720,48 +789,118 @@ const UserManagement = ({ currentUser }) => {
             </div>
 
             <div className="bg-white shadow rounded-lg p-6">
-                <h3 className="text-xl font-semibold mb-4">Registered Users</h3>
-                {users.length > 0 ? (
-                    users.map((user) => (
-                        <div 
-                            key={user.id} 
-                            className="flex justify-between items-center bg-gray-50 p-4 rounded-lg mb-2"
-                        >
-                            <div>
-                                <span className="font-medium">{user.username}</span> - <span className="text-sm">{user.fullName || 'No name'}</span>
-                                <div className="text-sm text-gray-500">Email: {user.email}</div>
-                                <div className="text-sm text-gray-500">Role: {user.role}</div>
-                                <div className="text-sm text-gray-500">Address: {user.address || 'No address'}</div>
-                            </div>
-                            <div className="flex space-x-2">
-                                <button 
-                                    className="text-blue-600 hover:text-blue-900"
-                                    onClick={() => initiateEditUser(user)}
-                                    disabled={loading}
-                                >
-                                    <Edit2 className="h-5 w-5" />
-                                </button>
-                                <button 
-                                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                                    onClick={() => initiateDeleteUser(user)}
-                                    disabled={loading || user.id === currentUser.uid}
-                                >
-                                    <Trash2 className="h-5 w-5" />
-                                </button>
-                            </div>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-semibold">Registered Users</h3>
+                    <div className="flex space-x-2">
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search users..."
+                                className="pl-8 pr-4 py-2 border rounded-md"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
                         </div>
-                    ))
-                ) : (
-                    <p className="text-gray-500">No users found.</p>
-                )}
+                        <select
+                            className="border rounded-md px-2"
+                            value={filterRole}
+                            onChange={(e) => setFilterRole(e.target.value)}
+                        >
+                            <option value="all">All Roles</option>
+                            <option value="admin">Admin</option>
+                            <option value="user">User</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {filteredUsers.length > 0 ? (
+                                filteredUsers.map((user) => (
+                                    <tr key={user.id}>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-medium text-gray-900">{user.username}</div>
+                                            <div className="text-sm text-gray-500">{user.fullName || 'No name'}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">{user.email}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'}`}>
+                                                {user.role || 'user'}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm text-gray-900">{user.address || 'No address'}</div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex justify-end space-x-2">
+                                                <button 
+                                                    className="text-blue-600 hover:text-blue-900"
+                                                    onClick={() => initiateEditUser(user)}
+                                                    disabled={loading}
+                                                    title="Edit User"
+                                                >
+                                                    <Edit2 className="h-5 w-5" />
+                                                </button>
+                                                <button 
+                                                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                                    onClick={() => initiateDeleteUser(user)}
+                                                    disabled={loading || user.id === currentUser.uid}
+                                                    title={user.id === currentUser.uid ? "Cannot delete current user" : "Delete User"}
+                                                >
+                                                    <Trash2 className="h-5 w-5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
+                                        {searchTerm || filterRole !== 'all' 
+                                            ? 'No users match your search criteria.' 
+                                            : 'No users found.'}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+                <div className="mt-4 text-sm text-gray-500">
+                    Showing {filteredUsers.length} of {users.length} users
+                </div>
             </div>
 
             {showDeleteConfirm && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-white rounded-lg p-6 max-w-md w-full">
                         <h3 className="text-lg font-medium mb-4">Confirm User Deletion</h3>
+                        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4">
+                            <div className="flex">
+                                <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                                <div>
+                                    <p className="text-sm text-red-700 font-medium">Warning: This action cannot be undone</p>
+                                    <p className="text-sm text-red-700">
+                                        You are about to delete the user: <span className="font-bold">{userToDelete?.username}</span> ({userToDelete?.email})
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <p className="text-sm text-gray-600 mb-4">
-                            Please enter your admin password to confirm deletion of user: {userToDelete?.email}
+                            Please enter your admin password to confirm deletion:
                         </p>
                         <input
                             type="password"
@@ -792,7 +931,7 @@ const UserManagement = ({ currentUser }) => {
                             <button
                                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
                                 onClick={handleDeleteUser}
-                                disabled={loading}
+                                disabled={loading || !deleteUserPassword}
                             >
                                 {loading ? 'Deleting...' : 'Delete User'}
                             </button>
