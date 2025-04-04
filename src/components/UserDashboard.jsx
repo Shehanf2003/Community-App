@@ -72,4 +72,15 @@ return (
                                                     <span className="ml-2 text-sm text-red-500">New</span>
                                                 )}
                                             </p>
+                                            {announcement.imageUrl && (
+                                                <img
+                                                    src={announcement.imageUrl}
+                                                    alt="Announcement"
+                                                    className="mt-2 max-h-48 object-cover rounded"
+                                                />
+                                            )}
+                                            <p className="text-sm text-gray-500 mt-2">
+                                                Posted on {announcement.createdAt?.toDate().toLocaleDateString()}
+                                            </p>
+                                        </div> 
 export default UserDashboard;
