@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { Megaphone, PlusCircle, Users, User, Search, Edit, Trash2, AlertTriangle, CheckCircle, X, Calendar, RefreshCw } from 'lucide-react';
+import { getIdToken, getAuth } from 'firebase/auth';
 
 const Announcements = ({ currentUser }) => {
     const [announcements, setAnnouncements] = useState([]);
@@ -25,6 +26,7 @@ const Announcements = ({ currentUser }) => {
     
     const formRef = useRef(null);
     const db = getFirestore();
+    const auth = getAuth();
 
     // Check admin status whenever currentUser changes
     useEffect(() => {
@@ -167,67 +169,114 @@ const Announcements = ({ currentUser }) => {
         e.preventDefault();
         
         if (!currentUser?.uid) {
-            setError('You must be logged in to post announcements');
-            return;
+          setError('You must be logged in to post announcements');
+          return;
         }
         
         setIsSubmitting(true);
         setError('');
         
         try {
-            // Validate form
-            if (!newAnnouncement.trim()) {
-                setError('Announcement content cannot be empty');
-                setIsSubmitting(false);
-                return;
-            }
-            
-            if (targetAudience === 'specific' && (!selectedUsers.length)) {
-                setError('Please select at least one recipient for targeted announcements');
-                setIsSubmitting(false);
-                return;
-            }
-            
-            const announcementData = {
-                title: announcementTitle.trim() || 'Announcement',
-                content: newAnnouncement.trim(),
-                createdBy: currentUser.uid,
-                createdAt: serverTimestamp(),
-                read: {},
-                targetType: targetAudience,
-                targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-                updatedAt: serverTimestamp()
-            };
-
-            if (editMode && currentAnnouncementId) {
-                // Update existing announcement
-                const docRef = doc(db, 'announcements', currentAnnouncementId);
-                await updateDoc(docRef, {
-                    title: announcementTitle.trim() || 'Announcement',
-                    content: newAnnouncement.trim(),
-                    targetType: targetAudience,
-                    targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-                    updatedAt: serverTimestamp()
-                });
-                setSuccess('Announcement updated successfully!');
-            } else {
-                // Create new announcement
-                await addDoc(collection(db, 'announcements'), announcementData);
-                setSuccess('Announcement posted successfully!');
-                if (!formPinned) {
-                    setShowForm(false);
-                }
-            }
-            
-            resetForm();
-            await fetchAnnouncements(); // Await to ensure we get updated data
-        } catch (err) {
-            console.error('Error submitting announcement:', err);
-            setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
-        } finally {
+          // Validate form
+          if (!newAnnouncement.trim()) {
+            setError('Announcement content cannot be empty');
             setIsSubmitting(false);
+            return;
+          }
+          
+          if (targetAudience === 'specific' && (!selectedUsers.length)) {
+            setError('Please select at least one recipient for targeted announcements');
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const announcementData = {
+            title: announcementTitle.trim() || 'Announcement',
+            content: newAnnouncement.trim(),
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp(),
+            read: {},
+            targetType: targetAudience,
+            targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+            updatedAt: serverTimestamp()
+          };
+      
+          let docRef;
+          
+          if (editMode && currentAnnouncementId) {
+            // Update existing announcement
+            docRef = doc(db, 'announcements', currentAnnouncementId);
+            await updateDoc(docRef, {
+              title: announcementTitle.trim() || 'Announcement',
+              content: newAnnouncement.trim(),
+              targetType: targetAudience,
+              targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+              updatedAt: serverTimestamp()
+            });
+            setSuccess('Announcement updated successfully!');
+            
+            // Don't send email notifications for updates to avoid duplicate notifications
+          } else {
+            // Create new announcement
+            docRef = await addDoc(collection(db, 'announcements'), announcementData);
+            
+            // Send email notification for new announcements
+            const emailResult = await sendAnnouncementEmail(docRef.id);
+            
+            let successMessage = 'Announcement posted successfully!';
+            if (emailResult.success) {
+              successMessage += ' Email notifications sent.';
+            } else {
+              successMessage += ' However, email notifications could not be sent.';
+              console.warn('Email sending failed:', emailResult.error);
+            }
+            
+            setSuccess(successMessage);
+            
+            if (!formPinned) {
+              setShowForm(false);
+            }
+          }
+          
+          resetForm();
+          await fetchAnnouncements(); // Await to ensure we get updated data
+        } catch (err) {
+          console.error('Error submitting announcement:', err);
+          setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
+        } finally {
+          setIsSubmitting(false);
         }
-    };
+      };
+
+      const sendAnnouncementEmail = async (announcementId) => {
+        try {
+          // Get current user's ID token
+          const idToken = await getIdToken(auth.currentUser);
+          
+          const response = await fetch('/api/sendAnnouncementNotification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              idToken,
+              announcementId
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error sending announcement email:', data.error);
+            return { success: false, error: data.error };
+          }
+          
+          return { success: true, message: data.message };
+        } catch (error) {
+          console.error('Error sending announcement email:', error);
+          return { success: false, error: error.message };
+        }
+      };
 
     const resetForm = () => {
         setNewAnnouncement('');

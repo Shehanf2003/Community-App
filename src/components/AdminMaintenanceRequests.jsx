@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock } from 'lucide-react';
+import { getIdToken, getAuth } from 'firebase/auth';
 
 const MaintenanceRequests = ({ currentUser }) => {
     const [maintenanceRequests, setMaintenanceRequests] = useState([]);
@@ -26,6 +27,7 @@ const MaintenanceRequests = ({ currentUser }) => {
     const [expandedRequests, setExpandedRequests] = useState({});
 
     const db = getFirestore();
+    const auth = getAuth();
 
     useEffect(() => {
         fetchMaintenanceRequests();
@@ -203,52 +205,98 @@ const MaintenanceRequests = ({ currentUser }) => {
         setActionLoading(true);
         
         try {
-            const requestRef = doc(db, 'maintenance_requests', requestId);
-            const request = maintenanceRequests.find(r => r.id === requestId);
-            
-            // Create a new Date object for the comment timestamp
-            const currentDate = new Date();
-            
-            // Add the reply to maintenance request with a regular timestamp
-            await updateDoc(requestRef, {
-                comments: [...(request.comments || []), {
-                    content: replyText,
-                    createdAt: currentDate,
-                    createdBy: currentUser.uid,
-                    isAdminReply: true
-                }],
-                lastUpdated: serverTimestamp() // This is fine outside the array
-            });
-    
-            // Create notification for the user
-            const notificationRef = collection(db, 'notifications');
-            await addDoc(notificationRef, {
-                userId: request.userId,
-                type: 'maintenance_reply',
-                requestId: requestId,
-                content: replyText,
-                read: false,
-                createdAt: serverTimestamp(), // This is fine for a new document
-                maintenanceTitle: request.title
-            });
-    
-            // Clear the reply text for this request
-            if (selectedRequest === requestId) {
-                setReplyText('');
-                setSelectedRequest(null);
-            }
-    
-            await fetchMaintenanceRequests();
-            setSuccess('Reply sent successfully');
-            
-            // Auto dismiss success message after 3 seconds
-            setTimeout(() => setSuccess(''), 3000);
+          const requestRef = doc(db, 'maintenance_requests', requestId);
+          const request = maintenanceRequests.find(r => r.id === requestId);
+          
+          // Create a new Date object for the comment timestamp
+          const currentDate = new Date();
+          
+          // Create comment ID for reference
+          const commentId = `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          
+          // Add the reply to maintenance request with a regular timestamp
+          await updateDoc(requestRef, {
+            comments: [...(request.comments || []), {
+              id: commentId,
+              content: replyText,
+              createdAt: currentDate,
+              createdBy: currentUser.uid,
+              isAdminReply: true
+            }],
+            lastUpdated: serverTimestamp() // This is fine outside the array
+          });
+      
+          // Create notification for the user
+          const notificationRef = collection(db, 'notifications');
+          await addDoc(notificationRef, {
+            userId: request.userId,
+            type: 'maintenance_reply',
+            requestId: requestId,
+            content: replyText,
+            read: false,
+            createdAt: serverTimestamp(), // This is fine for a new document
+            maintenanceTitle: request.title
+          });
+          
+          // Send email notification
+          const emailResult = await sendMaintenanceReplyEmail(requestId, commentId);
+      
+          // Clear the reply text for this request
+          if (selectedRequest === requestId) {
+            setReplyText('');
+            setSelectedRequest(null);
+          }
+      
+          await fetchMaintenanceRequests();
+          
+          let successMessage = 'Reply sent successfully';
+          if (emailResult.success) {
+            successMessage += ' and email notification sent to the user.';
+          } else {
+            successMessage += '. However, email notification could not be sent.';
+            console.warn('Email sending failed:', emailResult.error);
+          }
+          
+          setSuccess(successMessage);
+          
+          // Auto dismiss success message after 3 seconds
+          setTimeout(() => setSuccess(''), 5000);
         } catch (error) {
-            setError('Error sending reply: ' + error.message);
+          setError('Error sending reply: ' + error.message);
         } finally {
-            setActionLoading(false);
+          setActionLoading(false);
         }
-    };
+      };
+      const sendMaintenanceReplyEmail = async (requestId, commentId) => {
+        try {
+          // Get current user's ID token
+          const idToken = await getIdToken(auth.currentUser);
+          
+          const response = await fetch('/api/sendMaintenanceReplyNotification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              idToken,
+              requestId,
+              commentId
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error sending maintenance reply email:', data.error);
+            return { success: false, error: data.error };
+          }
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error sending maintenance reply email:', error);
+          return { success: false, error: error.message };
+        }
+      };
     
     const handleDeleteRequest = async (requestId) => {
         setActionLoading(true);

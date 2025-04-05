@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, EmailAuthProvider, reauthenticateWithCredential, createUserWithEmailAndPassword, getIdToken } from 'firebase/auth';
 import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import { Trash2, Edit2, AlertTriangle, CheckCircle, Search } from "lucide-react";
 
@@ -110,6 +110,8 @@ const UserManagement = ({ currentUser }) => {
         }
     };
 
+   
+
     const handleRegisterUser = async (e) => {
         e.preventDefault();
         setError('');
@@ -159,10 +161,12 @@ const UserManagement = ({ currentUser }) => {
                 auth,
                 email,
                 password
-            );
-
-            // Add user details to Firestore
-            await setDoc(doc(db, 'users', userCredential.user.uid), {
+              );
+          
+              const newUserId = userCredential.user.uid;
+          
+              // Add user details to Firestore
+              await setDoc(doc(db, 'users', newUserId), {
                 email,
                 username,
                 fullName,
@@ -170,22 +174,63 @@ const UserManagement = ({ currentUser }) => {
                 role,
                 createdBy: currentUser.uid,
                 createdAt: new Date().toISOString()
-            });
-
-            setSuccess('User registered successfully!');
-            setEmail('');
-            setPassword('');
-            setUsername('');
-            setFullName('');
-            setRole('user');
-            setAddress('');
-            fetchUsers();
-        } catch (err) {
-            setError('Failed to register user: ' + err.message);
-        } finally {
-            setLoading(false);
+              });
+          
+              // Send email with credentials
+              const emailResult = await sendUserCredentialsEmail(newUserId, password);
+              
+              let successMessage = 'User registered successfully!';
+              if (emailResult.success) {
+                successMessage += ' Credentials email sent to the user.';
+              } else {
+                successMessage += ' However, credential email could not be sent.';
+                console.warn('Email sending failed:', emailResult.error);
+              }
+          
+              setSuccess(successMessage);
+              setEmail('');
+              setPassword('');
+              setUsername('');
+              setFullName('');
+              setRole('user');
+              setAddress('');
+              fetchUsers();
+            } catch (err) {
+              setError('Failed to register user: ' + err.message);
+            } finally {
+              setLoading(false);
+            }
+          };
+        const sendUserCredentialsEmail = async (userId, password) => {
+        try {
+          // Get current user's ID token
+          const idToken = await getIdToken(currentUser);
+          
+          const response = await fetch('/api/sendUserCredentials', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              idToken,
+              newUserId: userId,
+              password
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            console.error('Error sending credentials email:', data.error);
+            return { success: false, error: data.error };
+          }
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Error sending credentials email:', error);
+          return { success: false, error: error.message };
         }
-    };
+      };
 
     // New function to initiate edit mode
     const initiateEditUser = (user) => {
