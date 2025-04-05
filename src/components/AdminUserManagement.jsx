@@ -109,98 +109,97 @@ const UserManagement = ({ currentUser }) => {
             setLoading(false);
         }
     };
-
-   
-
+    
     const handleRegisterUser = async (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
         setLoading(true);
-
+    
         if (!username.trim()) {
             setError('Username is required');
             setLoading(false);
             return;
         }
-
+    
         if (!fullName.trim()) {
             setError('Full name is required');
             setLoading(false);
             return;
         }
-
+    
         if (!address) {
             setError('Address is required');
             setLoading(false);
             return;
         }
-
+    
         try {
             // Check if username already exists
             const usersSnapshot = await getDocs(collection(db, 'users'));
             const usernameExists = usersSnapshot.docs.some(
                 doc => doc.data().username?.toLowerCase() === username.toLowerCase()
             );
-
+    
             if (usernameExists) {
                 setError('Username already exists');
                 setLoading(false);
                 return;
             }
-
+    
             // Check if address is already assigned
             if (assignedAddresses.includes(address)) {
                 setError('This apartment address is already assigned to another user');
                 setLoading(false);
                 return;
             }
-
+    
             // Create new user
             const userCredential = await createUserWithEmailAndPassword(
                 auth,
                 email,
                 password
-              );
+            );
           
-              const newUserId = userCredential.user.uid;
+            const newUserId = userCredential.user.uid;
           
-              // Add user details to Firestore
-              await setDoc(doc(db, 'users', newUserId), {
+            // Add user details to Firestore, including registration date
+            await setDoc(doc(db, 'users', newUserId), {
                 email,
                 username,
                 fullName,
                 address,
                 role,
                 createdBy: currentUser.uid,
-                createdAt: new Date().toISOString()
-              });
+                createdAt: new Date().toISOString(),
+                registeredAt: new Date() // Add registration timestamp
+            });
           
-              // Send email with credentials
-              const emailResult = await sendUserCredentialsEmail(newUserId, password);
-              
-              let successMessage = 'User registered successfully!';
-              if (emailResult.success) {
+            // Send email with credentials
+            const emailResult = await sendUserCredentialsEmail(newUserId, password);
+          
+            let successMessage = 'User registered successfully!';
+            if (emailResult.success) {
                 successMessage += ' Credentials email sent to the user.';
-              } else {
+            } else {
                 successMessage += ' However, credential email could not be sent.';
                 console.warn('Email sending failed:', emailResult.error);
-              }
-          
-              setSuccess(successMessage);
-              setEmail('');
-              setPassword('');
-              setUsername('');
-              setFullName('');
-              setRole('user');
-              setAddress('');
-              fetchUsers();
-            } catch (err) {
-              setError('Failed to register user: ' + err.message);
-            } finally {
-              setLoading(false);
             }
-          };
+          
+            setSuccess(successMessage);
+            setEmail('');
+            setPassword('');
+            setUsername('');
+            setFullName('');
+            setRole('user');
+            setAddress('');
+            fetchUsers();
+        } catch (err) {
+            setError('Failed to register user: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
         const sendUserCredentialsEmail = async (userId, password) => {
         try {
           // Get current user's ID token

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import Notifications from './notifications';
-import { Menu, X, ChevronDown, User as UserIcon, LogOut, Home, Wrench, Calendar, MessageSquare, Users } from 'lucide-react';
+import { Menu, X, ChevronDown, User as UserIcon, LogOut, Home, Wrench, Calendar, MessageSquare } from 'lucide-react';
 
 const Navbar = () => {
   const { currentUser, logout } = useAuth();
@@ -71,13 +71,12 @@ const Navbar = () => {
     return location.pathname === route;
   };
 
-  // Navigation items configuration
+  // Navigation items configuration - removed Community Directory
   const navItems = [
     { path: '/user', label: 'Announcements', icon: <Home size={18} /> },
     { path: '/user/maintenance', label: 'Maintenance Requests', icon: <Wrench size={18} /> },
     { path: '/user/resources', label: 'Resource Booking', icon: <Calendar size={18} /> },
-    { path: '/user/forum', label: 'Community Forum', icon: <MessageSquare size={18} /> },
-    { path: '/user/community', label: 'Community Directory', icon: <Users size={18} /> }
+    { path: '/user/forum', label: 'Community Forum', icon: <MessageSquare size={18} /> }
   ];
 
   return (
@@ -139,7 +138,7 @@ const Navbar = () => {
                 </div>
               </button>
 
-              {/* Profile dropdown */}
+              {/* Profile dropdown - removed "Your Profile" option */}
               {isProfileDropdownOpen && (
                 <div
                   className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
@@ -151,15 +150,6 @@ const Navbar = () => {
                   <div className="px-4 py-2 text-sm text-gray-700 border-b">
                     Signed in as <span className="font-semibold">{username || 'User'}</span>
                   </div>
-                  <Link
-                    to="/user/profile"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                    role="menuitem"
-                    tabIndex="-1"
-                  >
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    Your Profile
-                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"

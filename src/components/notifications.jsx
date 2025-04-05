@@ -23,14 +23,50 @@ const Notifications = () => {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('all'); // 'all', 'unread', 'read'
     const [showDropdown, setShowDropdown] = useState(false);
+    const [userRegistrationDate, setUserRegistrationDate] = useState(null);
     const dropdownRef = useRef(null);
     const notificationRef = useRef(null);
     const { currentUser } = useAuth();
     const db = getFirestore();
 
-    // Load all notifications, including read ones
+    // First, fetch the user's registration date
     useEffect(() => {
         if (!currentUser?.uid) return;
+        
+        const fetchUserData = async () => {
+            try {
+                const userDocRef = doc(db, 'users', currentUser.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    // Get registration date (convert from ISO string if needed)
+                    let registrationDate = userDoc.data().registeredAt;
+                    
+                    // Handle different date formats (Firestore timestamp or ISO string)
+                    if (registrationDate && typeof registrationDate === 'string') {
+                        registrationDate = new Date(registrationDate);
+                    } else if (registrationDate && registrationDate.toDate) {
+                        registrationDate = registrationDate.toDate();
+                    } else {
+                        // If no registration date exists, use a fallback date (show all announcements)
+                        registrationDate = new Date(0); // Jan 1, 1970
+                    }
+                    
+                    setUserRegistrationDate(registrationDate);
+                }
+            } catch (err) {
+                console.error('Error fetching user registration date:', err);
+                // Set a fallback date to avoid errors (show all announcements)
+                setUserRegistrationDate(new Date(0));
+            }
+        };
+
+        fetchUserData();
+    }, [currentUser, db]);
+
+    // Load all notifications, including read ones - after we have the registration date
+    useEffect(() => {
+        if (!currentUser?.uid || userRegistrationDate === null) return;
         setLoading(true);
         setError(null);
 
@@ -62,16 +98,40 @@ const Notifications = () => {
             });
 
             const unsubscribeAnnouncements = onSnapshot(announcementQuery, (snapshot) => {
-                const announcements = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    type: 'announcement',
-                    isAnnouncement: true,
-                    content: doc.data().content,
-                    createdAt: doc.data().createdAt,
-                    title: doc.data().title || 'Community Announcement',
-                    imageUrl: doc.data().imageUrl,
-                    read: doc.data().read?.[currentUser.uid] || false
-                }));
+                // Filter announcements to only include those created after the user registered
+                const announcements = snapshot.docs
+                    .map(doc => ({
+                        id: doc.id,
+                        type: 'announcement',
+                        isAnnouncement: true,
+                        content: doc.data().content,
+                        createdAt: doc.data().createdAt,
+                        title: doc.data().title || 'Community Announcement',
+                        imageUrl: doc.data().imageUrl,
+                        read: doc.data().read?.[currentUser.uid] || false,
+                        targetType: doc.data().targetType,
+                        targetUsers: doc.data().targetUsers
+                    }))
+                    .filter(announcement => {
+                        // Parse announcement date
+                        const announcementDate = announcement.createdAt?.toDate 
+                            ? announcement.createdAt.toDate() 
+                            : new Date(announcement.createdAt);
+                        
+                        // Check if the announcement was created after the user registered
+                        const isAfterRegistration = announcementDate > userRegistrationDate;
+                        
+                        // Check if the announcement is targeted to this user
+                        const isTargetedToUser = 
+                            announcement.targetType === undefined || // Legacy announcements
+                            announcement.targetType === 'all' ||
+                            (announcement.targetType === 'specific' && 
+                            announcement.targetUsers && 
+                            announcement.targetUsers.includes(currentUser.uid));
+                        
+                        // Only include announcements created after registration AND targeted to this user
+                        return isAfterRegistration && isTargetedToUser;
+                    });
 
                 updateNotificationsAndCount(announcements, 'announcement');
                 setLoading(false);
@@ -90,7 +150,7 @@ const Notifications = () => {
             setError("Something went wrong");
             setLoading(false);
         }
-    }, [currentUser]);
+    }, [currentUser, db, userRegistrationDate]);
 
     // Handle clicks outside the dropdown to close it
     useEffect(() => {
@@ -132,9 +192,11 @@ const Notifications = () => {
             const otherTypes = currentNotifications.filter(n => 
                 type === 'personal' ? n.isAnnouncement : !n.isAnnouncement
             );
-            const merged = [...otherTypes, ...newNotifications].sort((a, b) => 
-                b.createdAt?.toDate?.() - a.createdAt?.toDate?.()
-            );
+            const merged = [...otherTypes, ...newNotifications].sort((a, b) => {
+                const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt || 0);
+                const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt || 0);
+                return dateB - dateA;
+            });
             
             // Update unread count
             const unreadItems = merged.filter(n => !n.read);
@@ -256,7 +318,7 @@ const Notifications = () => {
         if (!timestamp) return '';
         
         const now = new Date();
-        const date = timestamp.toDate();
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         const seconds = Math.floor((now - date) / 1000);
         
         if (seconds < 60) return 'just now';

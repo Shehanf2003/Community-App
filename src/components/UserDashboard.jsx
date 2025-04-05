@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -9,19 +9,54 @@ const UserDashboard = () => {
     const [error, setError] = useState(null);
     const [expandedAnnouncement, setExpandedAnnouncement] = useState(null);
     const { currentUser } = useAuth();
+    const [userRegistrationDate, setUserRegistrationDate] = useState(null);
 
     useEffect(() => {
-        fetchAnnouncements();
-    }, []);
+        // First fetch the user's registration date, then fetch announcements
+        const fetchUserData = async () => {
+            try {
+                const userDocRef = doc(db, 'users', currentUser.uid);
+                const userDoc = await getDoc(userDocRef);
+                
+                if (userDoc.exists()) {
+                    // Get registration date (convert from ISO string if needed)
+                    let registrationDate = userDoc.data().registeredAt;
+                    
+                    // Handle different date formats (Firestore timestamp or ISO string)
+                    if (registrationDate && typeof registrationDate === 'string') {
+                        registrationDate = new Date(registrationDate);
+                    } else if (registrationDate && registrationDate.toDate) {
+                        registrationDate = registrationDate.toDate();
+                    } else {
+                        // If no registration date exists, use a fallback date (show all announcements)
+                        registrationDate = new Date(0); // Jan 1, 1970
+                    }
+                    
+                    setUserRegistrationDate(registrationDate);
+                    // Now fetch announcements with the registration date
+                    fetchAnnouncements(registrationDate);
+                } else {
+                    setError("User profile not found. Please contact administrator.");
+                    setIsLoading(false);
+                }
+            } catch (err) {
+                console.error('Error fetching user data:', err);
+                setError('Failed to load user data. Please try again later.');
+                setIsLoading(false);
+            }
+        };
 
-    const fetchAnnouncements = async () => {
+        fetchUserData();
+    }, [currentUser.uid]);
+
+    const fetchAnnouncements = async (registrationDate) => {
         setIsLoading(true);
         setError(null);
         try {
             const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
             
-            // Filter announcements client-side for visibility based on targeting
+            // Filter announcements client-side for visibility based on targeting and registration date
             const announcementsList = querySnapshot.docs
                 .map(doc => ({
                     id: doc.id,
@@ -29,14 +64,24 @@ const UserDashboard = () => {
                     isNew: !doc.data().read?.[currentUser.uid]
                 }))
                 .filter(announcement => {
+                    // Check if announcement was created after user registration
+                    const announcementDate = announcement.createdAt?.toDate ? 
+                        announcement.createdAt.toDate() : new Date(announcement.createdAt);
+                    
+                    const isAfterRegistration = registrationDate ? 
+                        announcementDate > registrationDate : true;
+                    
                     // Show announcement if:
-                    // 1. It's targeted to all users, or
-                    // 2. It's specifically targeted to this user
-                    return announcement.targetType === undefined || // Handle legacy announcements
-                           announcement.targetType === 'all' ||
-                           (announcement.targetType === 'specific' && 
-                            announcement.targetUsers && 
-                            announcement.targetUsers.includes(currentUser.uid));
+                    // 1. It's created after user registration, and
+                    // 2. It's targeted to all users, or
+                    // 3. It's specifically targeted to this user
+                    return isAfterRegistration && (
+                        announcement.targetType === undefined || // Handle legacy announcements
+                        announcement.targetType === 'all' ||
+                        (announcement.targetType === 'specific' && 
+                         announcement.targetUsers && 
+                         announcement.targetUsers.includes(currentUser.uid))
+                    );
                 });
 
             setAnnouncements(announcementsList);
@@ -76,7 +121,7 @@ const UserDashboard = () => {
 
     const formatDate = (timestamp) => {
         if (!timestamp) return '';
-        const date = timestamp.toDate();
+        const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
         return new Intl.DateTimeFormat('en-US', {
             weekday: 'long',
             year: 'numeric',
@@ -88,7 +133,9 @@ const UserDashboard = () => {
     };
 
     const refreshAnnouncements = () => {
-        fetchAnnouncements();
+        if (userRegistrationDate) {
+            fetchAnnouncements(userRegistrationDate);
+        }
     };
 
     return (
@@ -158,7 +205,7 @@ const UserDashboard = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                                     </svg>
                                     <h3 className="mt-2 text-lg font-medium text-gray-900">No announcements</h3>
-                                    <p className="mt-1 text-sm text-gray-500">There are no announcements for you at this time.</p>
+                                    <p className="mt-1 text-sm text-gray-500">There are no new announcements for you at this time.</p>
                                 </div>
                             ) : (
                                 <div className="space-y-4">
