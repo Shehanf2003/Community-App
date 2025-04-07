@@ -83,4 +83,22 @@ return (
                                                 Posted on {announcement.createdAt?.toDate().toLocaleDateString()}
                                             </p>
                                         </div> 
+                                        {announcement.isNew && (
+                                            <button
+                                                onClick={() => markAsViewed(announcement.id)}
+                                                className="ml-4 text-sm text-blue-600 hover:text-blue-800"
+                                            >
+                                                Mark as read
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
 export default UserDashboard;
