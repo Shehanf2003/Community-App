@@ -4,7 +4,6 @@ const ThreadImage = ({ imageUrl, imageId, shareUrl, webUrl }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
   
   // Add useEffect to preload image when component mounts
   useEffect(() => {
@@ -12,7 +11,6 @@ const ThreadImage = ({ imageUrl, imageId, shareUrl, webUrl }) => {
       // Reset states when imageUrl changes
       setIsLoading(true);
       setError(null);
-      setImageLoaded(false);
       
       // Preload the image
       const img = new Image();
@@ -20,7 +18,6 @@ const ThreadImage = ({ imageUrl, imageId, shareUrl, webUrl }) => {
       
       img.onload = () => {
         setIsLoading(false);
-        setImageLoaded(true);
       };
       
       img.onerror = () => {
@@ -81,15 +78,17 @@ const ThreadImage = ({ imageUrl, imageId, shareUrl, webUrl }) => {
       )}
       
       <div className={isLoading ? 'hidden' : ''}>
-        <img
-          src={isFullScreen ? fullSizeUrl : thumbnailUrl}
-          alt="Thread attachment"
-          className={`max-w-full rounded ${isFullScreen ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
-          onClick={toggleFullScreen}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-          loading="lazy"
-        />
+        <div className="thread-image-container" style={{ width: '400px', height: '300px', overflow: 'hidden' }}>
+          <img
+            src={isFullScreen ? fullSizeUrl : thumbnailUrl}
+            alt="Thread attachment"
+            className={`w-full h-full object-cover rounded ${isFullScreen ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
+            onClick={toggleFullScreen}
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            loading="lazy"
+          />
+        </div>
         
         {!isFullScreen && (
           <div className="mt-1 text-xs text-gray-500 flex items-center space-x-2">

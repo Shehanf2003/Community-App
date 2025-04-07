@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock, Image as ImageIcon } from 'lucide-react';
 import { getIdToken, getAuth } from 'firebase/auth';
-import MaintenanceRequestImage from './MaintenanceRequestImage'; // Import the new component
+import MaintenanceRequestImage from './MaintenanceRequestImage'; 
 
 const MaintenanceRequests = ({ currentUser }) => {
     const [maintenanceRequests, setMaintenanceRequests] = useState([]);

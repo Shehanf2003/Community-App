@@ -329,11 +329,6 @@ const CommunityForum = () => {
                           Remove
                         </button>
                       </div>
-                      <img 
-                        src={imageData.imageUrl} 
-                        alt="Thread attachment" 
-                        className="max-w-full max-h-64 rounded object-contain"
-                      />
                     </div>
                   )}
                 </>

@@ -4,7 +4,6 @@ import cloudinaryConfig from '../CloudinaryConfig';
 const ImageUploader = ({ onImageUploaded }) => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
   const [uploadComplete, setUploadComplete] = useState(false);
 
   const handleFileChange = async (e) => {
@@ -24,9 +23,6 @@ const ImageUploader = ({ onImageUploaded }) => {
       return;
     }
     
-    // Create a preview
-    const localPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(localPreviewUrl);
     setError(null);
     
     // Auto-upload when file is selected
@@ -73,8 +69,6 @@ const ImageUploader = ({ onImageUploaded }) => {
     } catch (error) {
       console.error('Error uploading image:', error);
       setError('Failed to upload image. Please try again.');
-      // Clear the preview on error
-      setPreviewUrl(null);
     } finally {
       setUploading(false);
     }
@@ -116,18 +110,6 @@ const ImageUploader = ({ onImageUploaded }) => {
       {uploadComplete && (
         <div className="text-green-600 text-sm mb-3">
           Image uploaded successfully!
-        </div>
-      )}
-      
-      {/* Preview area */}
-      {previewUrl && (
-        <div className="mt-3 border rounded p-2">
-          <p className="text-sm font-medium mb-2">Image Preview:</p>
-          <img 
-            src={previewUrl} 
-            alt="Preview" 
-            className="max-w-full max-h-64 rounded object-contain"
-          />
         </div>
       )}
     </div>
