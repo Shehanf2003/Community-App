@@ -10,6 +10,7 @@ import CommunityForum from './components/CommunityForum.jsx';
 import ContactManagement from './components/contactManagement.jsx';
 import Navbar from './components/navbar.jsx';
 
+
 // ProtectedRoute component with role-based access
 const ProtectedRoute = ({ children, requiredRole }) => {
     const { currentUser, userRole, loading } = useAuth();

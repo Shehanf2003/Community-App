@@ -238,16 +238,24 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
     // Prepare email content
     const emailSubject = `Announcement: ${announcement.title || 'New Announcement'}`;
     const emailHtml = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #4f46e5;">${announcement.title || 'Announcement from Sunshine Heights'}</h2>
-        <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p style="white-space: pre-line;">${announcement.content}</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #4f46e5;">${announcement.title || 'Announcement from Sunshine Heights'}</h2>
+      
+      ${announcement.imageUrl ? `
+        <div style="margin: 15px 0;">
+          <img src="${announcement.imageUrl}" alt="Announcement Image" style="max-width: 100%; border-radius: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
         </div>
-        <p style="font-size: 0.9em; color: #6b7280;">Posted by: ${adminDetails.name}</p>
-        <p style="font-size: 0.9em; color: #6b7280;">Date: ${new Date().toLocaleDateString()}</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
-        <p style="font-size: 0.8em; color: #6b7280;">This is an automated message from the Sunshine Heights Apartment Portal. Please do not reply to this email.</p>
+      ` : ''}
+      
+      <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
+        <p style="white-space: pre-line;">${announcement.content}</p>
       </div>
+      
+      <p style="font-size: 0.9em; color: #6b7280;">Posted by: ${adminDetails.name}</p>
+      <p style="font-size: 0.9em; color: #6b7280;">Date: ${new Date().toLocaleDateString()}</p>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+      <p style="font-size: 0.8em; color: #6b7280;">This is an automated message from the Sunshine Heights Apartment Portal. Please do not reply to this email.</p>
+    </div>
     `;
 
     // Send to appropriate recipients

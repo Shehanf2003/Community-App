@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getFirestore, collection, getDocs, getDoc, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { Megaphone, PlusCircle, Users, User, Search, Edit, Trash2, AlertTriangle, CheckCircle, X, Calendar, RefreshCw } from 'lucide-react';
 import { getIdToken, getAuth } from 'firebase/auth';
+import ImageUploader from '../components/ImageUploader';
 
 const Announcements = ({ currentUser }) => {
     const [announcements, setAnnouncements] = useState([]);
@@ -23,6 +24,7 @@ const Announcements = ({ currentUser }) => {
     const [anncFilter, setAnncFilter] = useState('all'); // 'all', 'toAll', 'targeted'
     const [expandedAnnouncement, setExpandedAnnouncement] = useState(null);
     const [confirmDelete, setConfirmDelete] = useState(null);
+    const [announcementImage, setAnnouncementImage] = useState(null);
     
     const formRef = useRef(null);
     const db = getFirestore();
@@ -165,88 +167,102 @@ const Announcements = ({ currentUser }) => {
         }
     };
 
-    const handleAnnouncementSubmit = async (e) => {
-        e.preventDefault();
-        
-        if (!currentUser?.uid) {
-          setError('You must be logged in to post announcements');
-          return;
-        }
-        
-        setIsSubmitting(true);
-        setError('');
-        
-        try {
-          // Validate form
-          if (!newAnnouncement.trim()) {
-            setError('Announcement content cannot be empty');
-            setIsSubmitting(false);
-            return;
-          }
-          
-          if (targetAudience === 'specific' && (!selectedUsers.length)) {
-            setError('Please select at least one recipient for targeted announcements');
-            setIsSubmitting(false);
-            return;
-          }
-          
-          const announcementData = {
-            title: announcementTitle.trim() || 'Announcement',
-            content: newAnnouncement.trim(),
-            createdBy: currentUser.uid,
-            createdAt: serverTimestamp(),
-            read: {},
-            targetType: targetAudience,
-            targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-            updatedAt: serverTimestamp()
-          };
-      
-          let docRef;
-          
-          if (editMode && currentAnnouncementId) {
-            // Update existing announcement
-            docRef = doc(db, 'announcements', currentAnnouncementId);
-            await updateDoc(docRef, {
-              title: announcementTitle.trim() || 'Announcement',
-              content: newAnnouncement.trim(),
-              targetType: targetAudience,
-              targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-              updatedAt: serverTimestamp()
-            });
-            setSuccess('Announcement updated successfully!');
-            
-            // Don't send email notifications for updates to avoid duplicate notifications
-          } else {
-            // Create new announcement
-            docRef = await addDoc(collection(db, 'announcements'), announcementData);
-            
-            // Send email notification for new announcements
-            const emailResult = await sendAnnouncementEmail(docRef.id);
-            
-            let successMessage = 'Announcement posted successfully!';
-            if (emailResult.success) {
-              successMessage += ' Email notifications sent.';
-            } else {
-              successMessage += ' However, email notifications could not be sent.';
-              console.warn('Email sending failed:', emailResult.error);
-            }
-            
-            setSuccess(successMessage);
-            
-            if (!formPinned) {
-              setShowForm(false);
-            }
-          }
-          
-          resetForm();
-          await fetchAnnouncements(); // Await to ensure we get updated data
-        } catch (err) {
-          console.error('Error submitting announcement:', err);
-          setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
-        } finally {
-          setIsSubmitting(false);
-        }
+    const handleImageUploaded = (imageData) => {
+        setAnnouncementImage(imageData);
+        setSuccess('Image uploaded successfully!');
       };
+// Update the handleAnnouncementSubmit function to include image data
+const handleAnnouncementSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!currentUser?.uid) {
+      setError('You must be logged in to post announcements');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError('');
+    
+    try {
+      // Validate form
+      if (!newAnnouncement.trim()) {
+        setError('Announcement content cannot be empty');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      if (targetAudience === 'specific' && (!selectedUsers.length)) {
+        setError('Please select at least one recipient for targeted announcements');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      const announcementData = {
+        title: announcementTitle.trim() || 'Announcement',
+        content: newAnnouncement.trim(),
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp(),
+        read: {},
+        targetType: targetAudience,
+        targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+        updatedAt: serverTimestamp(),
+        // Add image data if available
+        ...(announcementImage && {
+          imageUrl: announcementImage.imageUrl,
+          imageId: announcementImage.imageId
+        })
+      };
+  
+      let docRef;
+      
+      if (editMode && currentAnnouncementId) {
+        // Update existing announcement
+        docRef = doc(db, 'announcements', currentAnnouncementId);
+        await updateDoc(docRef, {
+          title: announcementTitle.trim() || 'Announcement',
+          content: newAnnouncement.trim(),
+          targetType: targetAudience,
+          targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+          updatedAt: serverTimestamp(),
+          // Add or update image data if available
+          ...(announcementImage && {
+            imageUrl: announcementImage.imageUrl,
+            imageId: announcementImage.imageId
+          })
+        });
+        setSuccess('Announcement updated successfully!');
+        
+      } else {
+        // Create new announcement
+        docRef = await addDoc(collection(db, 'announcements'), announcementData);
+        
+        // Send email notification for new announcements
+        const emailResult = await sendAnnouncementEmail(docRef.id);
+        
+        let successMessage = 'Announcement posted successfully!';
+        if (emailResult.success) {
+          successMessage += ' Email notifications sent.';
+        } else {
+          successMessage += ' However, email notifications could not be sent.';
+          console.warn('Email sending failed:', emailResult.error);
+        }
+        
+        setSuccess(successMessage);
+        
+        if (!formPinned) {
+          setShowForm(false);
+        }
+      }
+      
+      resetForm();
+      await fetchAnnouncements(); // Await to ensure we get updated data
+    } catch (err) {
+      console.error('Error submitting announcement:', err);
+      setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
       const sendAnnouncementEmail = async (announcementId) => {
         try {
@@ -278,7 +294,7 @@ const Announcements = ({ currentUser }) => {
         }
       };
 
-    const resetForm = () => {
+      const resetForm = () => {
         setNewAnnouncement('');
         setAnnouncementTitle('');
         setTargetAudience('all');
@@ -286,23 +302,32 @@ const Announcements = ({ currentUser }) => {
         setSearchTerm('');
         setEditMode(false);
         setCurrentAnnouncementId(null);
-    };
+        setAnnouncementImage(null); // Reset image state
+      };
 
-    const handleEditAnnouncement = (announcement) => {
+      const handleEditAnnouncement = (announcement) => {
         setAnnouncementTitle(announcement.title || '');
         setNewAnnouncement(announcement.content);
         setTargetAudience(announcement.targetType || 'all');
         if (announcement.targetType === 'specific' && announcement.targetUsers && announcement.targetUsers.length > 0) {
-            setSelectedUsers(announcement.targetUsers);
+          setSelectedUsers(announcement.targetUsers);
         } else {
-            setSelectedUsers([]);
+          setSelectedUsers([]);
+        }
+        // Set image data if available
+        if (announcement.imageUrl && announcement.imageId) {
+          setAnnouncementImage({
+            imageUrl: announcement.imageUrl,
+            imageId: announcement.imageId
+          });
+        } else {
+          setAnnouncementImage(null);
         }
         setEditMode(true);
         setCurrentAnnouncementId(announcement.id);
         setShowForm(true);
         setFormPinned(true);
-        // Scroll to form will be handled by useEffect
-    };
+      };
 
     const confirmDeleteAnnouncement = (announcement) => {
         setConfirmDelete(announcement);
@@ -499,7 +524,37 @@ const Announcements = ({ currentUser }) => {
                                 placeholder="Type your announcement here..."
                             />
                         </div>
-                        
+
+                        {/* Add this inside the form, after the content textarea */}
+                            <div className="mt-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Add Image (optional)
+                            </label>
+                            {announcementImage ? (
+                                <div className="mb-3">
+                                <div className="relative w-full h-48 bg-gray-100 rounded-md overflow-hidden mb-2">
+                                    <img 
+                                    src={announcementImage.imageUrl} 
+                                    alt="Announcement" 
+                                    className="w-full h-full object-contain"
+                                    />
+                                    <button
+                                    type="button"
+                                    onClick={() => setAnnouncementImage(null)}
+                                    className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1 hover:bg-red-700 focus:outline-none"
+                                    title="Remove image"
+                                    >
+                                    <X className="h-4 w-4" />
+                                    </button>
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                    Image uploaded successfully. Click the X button to remove it.
+                                </p>
+                                </div>
+                            ) : (
+                                <ImageUploader onImageUploaded={handleImageUploaded} />
+                            )}
+                            </div>                         
                         <div>
                             <label htmlFor="target-audience" className="block text-sm font-medium text-gray-700 mb-1">
                                 Target Audience
@@ -759,7 +814,22 @@ const Announcements = ({ currentUser }) => {
                                         <div className={expandedAnnouncement === announcement.id ? '' : 'line-clamp-2'}>
                                             <p className="text-gray-700 whitespace-pre-line">{announcement.content}</p>
                                         </div>
-                                        
+
+                                         {/* Add image display here, inside the announcement rendering */}
+                                                {announcement.imageUrl && (
+                                                <div className="mt-3 mb-2">
+                                                    <img
+                                                        src={announcement.imageUrl}
+                                                        alt="Announcement"
+                                                        className="rounded-md shadow-sm max-h-40 object-cover hover:opacity-90 cursor-pointer"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(announcement.imageUrl, '_blank');
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                                                    
                                         <div className="flex flex-wrap mt-2 space-x-2">
                                             <div className="flex items-center text-xs text-gray-500">
                                                 <Calendar className="h-3.5 w-3.5 mr-1" />
