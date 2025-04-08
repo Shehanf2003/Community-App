@@ -175,6 +175,18 @@ const AdminDashboard = () => {
                         </div>
                     )}
 
+                    {/* Tab Navigation */}
+                    <div className="flex border-b mb-6">
+
+                        <button
+                            className={`px-4 py-2 mr-2 ${activeTab === 'maintenance' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('maintenance')}
+                        >
+                            Maintenance Requests
+                        </button>
+                    </div>
+
+                    {/* Tab Content */}
                     <div className="bg-gray-50 p-6 rounded-lg mb-6">
                         <h3 className="text-xl font-semibold mb-4">Register New User</h3>
                         <form onSubmit={handleRegisterUser} className="space-y-4">
