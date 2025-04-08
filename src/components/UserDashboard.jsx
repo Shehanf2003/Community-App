@@ -64,4 +64,41 @@ return (
                                 key={announcement.id}
                                 className={`border rounded-lg p-4 ${announcement.isNew ? 'bg-blue-50' : ''}`}
                             >
+                                <div className="flex justify-between items-start">
+                                        <div className="flex-grow">
+                                            <p className={`text-gray-900 mb-2 ${announcement.isNew ? 'font-bold' : 'font-normal'}`}>
+                                                {announcement.content}
+                                                {announcement.isNew && (
+                                                    <span className="ml-2 text-sm text-red-500">New</span>
+                                                )}
+                                            </p>
+                                            {announcement.imageUrl && (
+                                                <img
+                                                    src={announcement.imageUrl}
+                                                    alt="Announcement"
+                                                    className="mt-2 max-h-48 object-cover rounded"
+                                                />
+                                            )}
+                                            <p className="text-sm text-gray-500 mt-2">
+                                                Posted on {announcement.createdAt?.toDate().toLocaleDateString()}
+                                            </p>
+                                        </div> 
+                                        {announcement.isNew && (
+                                            <button
+                                                onClick={() => markAsViewed(announcement.id)}
+                                                className="ml-4 text-sm text-blue-600 hover:text-blue-800"
+                                            >
+                                                Mark as read
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
 export default UserDashboard;

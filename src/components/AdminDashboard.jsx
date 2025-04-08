@@ -163,7 +163,7 @@ const AdminDashboard = () => {
                         <form onSubmit={handleRegisterUser} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">
-                                    Email
+                                    email
                                 </label>
                                 <input
                                     type="email"
