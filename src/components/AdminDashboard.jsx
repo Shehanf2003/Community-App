@@ -42,7 +42,7 @@ const AdminDashboard = () => {
         }
     };
 
-    const fetchMaintenancRequests = async () => {
+    const fetchMaintenanceRequests = async () => {
         try {
             const q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
@@ -52,7 +52,7 @@ const AdminDashboard = () => {
             }));
             setMaintenanceRequests(requestsList);
         } catch (err) {
-            setError('Error fetching maintenance requests:' + err.message);
+            setError('Error fetching maintenance requests: ' + err.message);
         }
     };
 
