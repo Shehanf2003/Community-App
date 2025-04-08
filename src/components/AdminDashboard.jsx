@@ -302,6 +302,31 @@ const AdminDashboard = () => {
                         </div>
                     </div>
                 </div>
+
+                <div className="space-y-6">
+                    <div className="space-y-4">
+                        <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+                                        
+                        {maintenanceRequests.map((request) => (
+                            <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h4 className="font-medium">{request.title}</h4>
+                                        <p className="text-sm text-gray-500">
+                                             Submitted by: {request.userName} | Location: {request.location}
+                                        </p>
+                                        <p className="text-sm text-gray-500">
+                                            Priority: {request.priority} | Status: {request.status}
+                                        </p>
+                                    </div>
+                                </div>
+                                                
+                                <p className="text-gray-700">{request.description}</p>                                                
+                                                
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );
