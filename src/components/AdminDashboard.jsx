@@ -11,6 +11,7 @@ const AdminDashboard = () => {
     const [role, setRole] = useState('user');
     const [users, setUsers] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
+    const [maintenanceRequests, setMaintenanceRequests] = useState([]);
     const [newAnnouncement, setNewAnnouncement] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ const AdminDashboard = () => {
     useEffect(() => {
         fetchUsers();
         fetchAnnouncements();
+        fetchMaintenanceRequests();
     }, []);
 
     const fetchUsers = async () => {
@@ -39,6 +41,21 @@ const AdminDashboard = () => {
             setError('Error fetching users: ' + err.message);
         }
     };
+
+    const fetchMaintenancRequests = async () => {
+        try {
+            const q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+            const requestsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMaintenanceRequests(requestsList);
+        } catch (err) {
+            setError('Error fetching maintenance requests:' + err.message);
+        }
+    };
+
 
     const fetchAnnouncements = async () => {
         try {
