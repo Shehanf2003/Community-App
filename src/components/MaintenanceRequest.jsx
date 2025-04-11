@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import { AlertTriangle, CheckCircle, Wrench, MapPin, X, Info, Loader2, Camera, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
-import cloudinaryConfig from '../CloudinaryConfig';
+import { AlertTriangle, CheckCircle, Wrench, MapPin, X, Info, Loader2, Camera } from 'lucide-react';
+import ImageUploader from './ImageUploader'; // Import the ImageUploader component
 
 const MaintenanceRequest = () => {
   const [title, setTitle] = useState('');
@@ -19,14 +19,9 @@ const MaintenanceRequest = () => {
   const [submitting, setSubmitting] = useState(false);
   
   // New state for image upload
-  const [image, setImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState('');
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploadError, setUploadError] = useState('');
+  const [imageData, setImageData] = useState(null);
 
   const MAX_DESCRIPTION_LENGTH = 500;
-  const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 
   const { currentUser } = useAuth();
   const db = getFirestore();
@@ -78,101 +73,21 @@ const MaintenanceRequest = () => {
     }
   }, [currentUser, db]);
 
-  // Handle image file selection
-  const handleImageChange = (e) => {
-    setUploadError('');
-    const file = e.target.files[0];
-    
-    if (!file) return;
-    
-    // Check file size
-    if (file.size > MAX_IMAGE_SIZE) {
-      setUploadError(`Image too large. Maximum size is ${MAX_IMAGE_SIZE / (1024 * 1024)}MB`);
-      return;
-    }
-    
-    // Check file type
-    if (!file.type.match('image.*')) {
-      setUploadError('Please select an image file (JPEG, PNG, etc.)');
-      return;
-    }
-    
-    setImage(file);
-    
-    // Create preview
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview(e.target.result);
-    };
-    reader.readAsDataURL(file);
+  // Handle image uploaded from ImageUploader component
+  const handleImageUploaded = (uploadedImageData) => {
+    setImageData(uploadedImageData);
   };
 
   // Remove image
   const handleRemoveImage = () => {
-    setImage(null);
-    setImagePreview('');
-    setUploadError('');
-    setUploadProgress(0);
+    setImageData(null);
   };
-
-  // Upload image to Cloudinary
-  const uploadImageToCloudinary = useCallback(async (file) => {
-    setUploadingImage(true);
-    setUploadProgress(0);
-    setUploadError('');
-    
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', cloudinaryConfig.uploadPreset);
-      formData.append('folder', cloudinaryConfig.folder);
-      
-      // Create a unique public_id for this upload based on maintenance request
-      const timestamp = new Date().toISOString();
-      const publicId = `maintenance_${currentUser.uid}_${timestamp}`;
-      formData.append('public_id', publicId);
-      
-      // Use fetch with XMLHttpRequest for upload progress
-      const xhr = new XMLHttpRequest();
-      
-      // Setup the progress event
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const percentComplete = Math.round((e.loaded / e.total) * 100);
-          setUploadProgress(percentComplete);
-        }
-      };
-      
-      return new Promise((resolve, reject) => {
-        xhr.open('POST', `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`);
-        
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const response = JSON.parse(xhr.responseText);
-            resolve(response);
-          } else {
-            reject(new Error('Upload failed'));
-          }
-        };
-        
-        xhr.onerror = () => reject(new Error('Upload failed'));
-        xhr.send(formData);
-      });
-    } catch (err) {
-      console.error('Error uploading image:', err);
-      setUploadError('Failed to upload image. Please try again.');
-      throw err;
-    } finally {
-      setUploadingImage(false);
-    }
-  }, [currentUser]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
     setSuccess('');
-    setUploadError('');
 
     try {
       if (description.length > MAX_DESCRIPTION_LENGTH) {
@@ -193,19 +108,12 @@ const MaintenanceRequest = () => {
         comments: [],
       };
 
-      // Add image if one was selected
-      if (image) {
-        try {
-          const uploadResult = await uploadImageToCloudinary(image);
-          
-          // Add image information to maintenance request
-          maintenanceData.imageUrl = uploadResult.secure_url;
-          maintenanceData.imageId = uploadResult.public_id;
-          maintenanceData.shareUrl = uploadResult.secure_url;
-        } catch (uploadErr) {
-          console.error('Error during image upload:', uploadErr);
-          throw new Error('Failed to upload image: ' + uploadErr.message);
-        }
+      // Add image data if available from ImageUploader
+      if (imageData) {
+        // Add image information to maintenance request
+        maintenanceData.imageUrl = imageData.imageUrl;
+        maintenanceData.imageId = imageData.imageId;
+        maintenanceData.shareUrl = imageData.shareUrl;
       }
 
       // Submit maintenance request to Firestore
@@ -220,9 +128,7 @@ const MaintenanceRequest = () => {
         setLocation('');
       }
       setDescriptionLength(0);
-      setImage(null);
-      setImagePreview('');
-      setUploadProgress(0);
+      setImageData(null);
       
       // Scroll to top to see success message
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -361,33 +267,21 @@ const MaintenanceRequest = () => {
                   </p>
                 </div>
 
-                {/* Image Upload Section */}
+                {/* Image Upload Section - Replaced with ImageUploader component */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Add a Photo <span className="text-gray-500 text-xs font-normal">(Optional)</span>
                   </label>
                   
-                  {!imagePreview ? (
-                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                      <div className="space-y-1 text-center">
-                        <Camera className="mx-auto h-12 w-12 text-gray-400" />
-                        <div className="flex text-sm text-gray-600">
-                          <label htmlFor="image-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
-                            <span>Upload a photo</span>
-                            <input 
-                              id="image-upload" 
-                              name="image-upload" 
-                              type="file" 
-                              className="sr-only"
-                              accept="image/*" 
-                              onChange={handleImageChange}
-                              disabled={submitting || uploadingImage}
-                            />
-                          </label>
-                          <p className="pl-1">or drag and drop</p>
+                  {!imageData ? (
+                    <div className="mt-1">
+                      <div className="bg-gray-50 p-4 rounded-md border border-gray-200">
+                        <div className="flex items-center justify-center mb-3">
+                          <Camera className="h-8 w-8 text-gray-400" />
                         </div>
-                        <p className="text-xs text-gray-500">
-                          PNG, JPG, GIF up to 5MB
+                        <ImageUploader onImageUploaded={handleImageUploaded} />
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          Adding a photo helps our maintenance team understand the issue better.
                         </p>
                       </div>
                     </div>
@@ -395,38 +289,24 @@ const MaintenanceRequest = () => {
                     <div className="mt-1 relative">
                       <div className="relative border border-gray-300 rounded-md overflow-hidden">
                         <img 
-                          src={imagePreview} 
-                          alt="Preview" 
+                          src={imageData.imageUrl} 
+                          alt="Uploaded" 
                           className="max-h-48 w-full object-contain"
                         />
                         <button
                           type="button"
                           onClick={handleRemoveImage}
                           className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600 focus:outline-none"
-                          disabled={submitting || uploadingImage}
+                          disabled={submitting}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      
-                      {uploadingImage && (
-                        <div className="mt-2">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-1">Uploading: {uploadProgress}%</p>
-                        </div>
-                      )}
+                      <p className="mt-1 text-xs text-green-600">
+                        Image uploaded successfully!
+                      </p>
                     </div>
                   )}
-                  
-                  {uploadError && (
-                    <p className="mt-1 text-xs text-red-500">{uploadError}</p>
-                  )}
-                  
-                  <p className="mt-1 text-xs text-gray-500">
-                    Adding a photo helps our maintenance team understand the issue better.
-                  </p>
                 </div>
 
                 <div>
@@ -505,13 +385,13 @@ const MaintenanceRequest = () => {
 
                 <button
                   type="submit"
-                  disabled={submitting || descriptionLength > MAX_DESCRIPTION_LENGTH || uploadingImage}
+                  disabled={submitting || descriptionLength > MAX_DESCRIPTION_LENGTH}
                   className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {submitting || uploadingImage ? (
+                  {submitting ? (
                     <>
                       <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" />
-                      {uploadingImage ? 'Uploading Image...' : 'Submitting...'}
+                      Submitting...
                     </>
                   ) : (
                     'Submit Maintenance Request'

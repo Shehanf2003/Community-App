@@ -9,6 +9,8 @@ import Booking from './components/Booking.jsx';
 import CommunityForum from './components/CommunityForum.jsx';
 import ContactManagement from './components/contactManagement.jsx';
 import Navbar from './components/navbar.jsx';
+import UserProfile from './components/UserProfile.jsx';
+import ChangePassword from './components/ChangePassword.jsx';
 
 
 // ProtectedRoute component with role-based access
@@ -73,6 +75,26 @@ const App = () => {
                             <ProtectedRoute requiredRole="user">
                                 <Navbar />
                                 <MaintenanceRequest />
+                            </ProtectedRoute>
+                        }
+                    />
+                    
+                    {/* New Profile Routes */}
+                    <Route
+                        path="/user/profile"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <Navbar />
+                                <UserProfile />
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/user/change-password"
+                        element={
+                            <ProtectedRoute requiredRole="user">
+                                <Navbar />
+                                <ChangePassword />
                             </ProtectedRoute>
                         }
                     />

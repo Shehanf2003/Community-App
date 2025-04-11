@@ -4,29 +4,34 @@ import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import Notifications from './notifications';
-import { Menu, X, ChevronDown, User as UserIcon, LogOut, Home, Wrench, Calendar, MessageSquare } from 'lucide-react';
+import { Menu, X, ChevronDown, User as UserIcon, LogOut, Home, Wrench, Calendar, MessageSquare, Key } from 'lucide-react';
 
 const Navbar = () => {
   const { currentUser, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
+  const [userEmail, setUserEmail] = useState('');
+  const [userAddress, setUserAddress] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const profileDropdownRef = useRef(null);
 
   useEffect(() => {
-    const fetchUsername = async () => {
+    const fetchUserData = async () => {
       setIsLoading(true);
       if (currentUser?.uid) {
         try {
           const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
           if (userDoc.exists()) {
-            setUsername(userDoc.data().username);
+            const userData = userDoc.data();
+            setUsername(userData.username || userData.fullName || 'User');
+            setUserEmail(userData.email || '');
+            setUserAddress(userData.address || 'No address on file');
           }
         } catch (error) {
-          console.error('Error fetching username:', error);
+          console.error('Error fetching user data:', error);
           setUsername('User');
         } finally {
           setIsLoading(false);
@@ -36,7 +41,7 @@ const Navbar = () => {
       }
     };
 
-    fetchUsername();
+    fetchUserData();
   }, [currentUser]);
 
   // Close dropdown when clicking outside
@@ -71,12 +76,13 @@ const Navbar = () => {
     return location.pathname === route;
   };
 
-  // Navigation items configuration - removed Community Directory
+  // Navigation items configuration
   const navItems = [
     { path: '/user', label: 'Announcements', icon: <Home size={18} /> },
     { path: '/user/maintenance', label: 'Maintenance Requests', icon: <Wrench size={18} /> },
     { path: '/user/resources', label: 'Resource Booking', icon: <Calendar size={18} /> },
-    { path: '/user/forum', label: 'Community Forum', icon: <MessageSquare size={18} /> }
+    { path: '/user/forum', label: 'Community Forum', icon: <MessageSquare size={18} /> },
+    { path: '/user/profile', label: 'My Profile', icon: <UserIcon size={18} /> }
   ];
 
   return (
@@ -138,7 +144,7 @@ const Navbar = () => {
                 </div>
               </button>
 
-              {/* Profile dropdown - removed "Your Profile" option */}
+              {/* Profile dropdown */}
               {isProfileDropdownOpen && (
                 <div
                   className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50"
@@ -150,6 +156,15 @@ const Navbar = () => {
                   <div className="px-4 py-2 text-sm text-gray-700 border-b">
                     Signed in as <span className="font-semibold">{username || 'User'}</span>
                   </div>
+                  <Link
+                    to="/user/profile"
+                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    role="menuitem"
+                    tabIndex="-1"
+                  >
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    My Profile
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
@@ -185,6 +200,23 @@ const Navbar = () => {
       {/* Mobile menu */}
       <div className={`md:hidden transition-all duration-200 ease-in-out ${isMobileMenuOpen ? 'max-h-screen' : 'max-h-0 overflow-hidden'}`}>
         <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-blue-700">
+          {/* User Profile Info in Mobile Menu */}
+          <div className="p-3 bg-blue-800 rounded-md mb-2">
+            <div className="flex items-center space-x-3 mb-2">
+              <div className="bg-blue-600 rounded-full p-2">
+                <UserIcon className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <div className="text-white font-medium">{username || 'User'}</div>
+                <div className="text-blue-200 text-sm">{userEmail || 'No email'}</div>
+              </div>
+            </div>
+            <div className="text-blue-200 text-sm pl-1">
+              <div className="mt-1">{userAddress}</div>
+            </div>
+          </div>
+
+          {/* Navigation Items */}
           {navItems.map((item) => (
             <Link
               key={item.path}
@@ -200,10 +232,17 @@ const Navbar = () => {
               {item.label}
             </Link>
           ))}
+          
+          {/* Password Change link in mobile menu */}
+          <Link
+            to="/user/change-password"
+            className="flex items-center px-3 py-2 rounded-md text-base font-medium text-blue-100 hover:bg-blue-600 hover:text-white"
+          >
+            <Key className="mr-2 h-5 w-5" />
+            Change Password
+          </Link>
+          
           <div className="border-t border-blue-800 pt-2 mt-2">
-            <div className="px-3 py-2 text-blue-100 text-sm">
-              Signed in as <span className="font-medium">{username || 'User'}</span>
-            </div>
             <button
               onClick={handleLogout}
               className="flex w-full items-center px-3 py-2 rounded-md text-base font-medium text-blue-100 hover:bg-blue-600 hover:text-white"

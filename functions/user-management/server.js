@@ -4,6 +4,7 @@ const admin = require('firebase-admin');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 // Load environment variables
 dotenv.config();
@@ -44,6 +45,10 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Define Firebase REST API URLs
+const FIREBASE_AUTH_SIGN_IN_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword';
+const FIREBASE_AUTH_CHANGE_PASSWORD_URL = 'https://identitytoolkit.googleapis.com/v1/accounts:update';
+
 // Middlewares
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -59,6 +64,121 @@ app.get('/health', (req, res) => {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// New endpoint for changing password
+app.post('/api/changePassword', async (req, res) => {
+  try {
+    const { idToken, currentPassword, newPassword } = req.body;
+
+    if (!idToken || !currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Missing required parameters' 
+      });
+    }
+
+    // Verify the user's ID token
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+    
+    // Get user email from Firestore
+    const userDoc = await admin.firestore().collection('users').doc(uid).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'User not found in database' 
+      });
+    }
+    
+    const userData = userDoc.data();
+    const email = userData.email;
+    
+    if (!email) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'User has no email address' 
+      });
+    }
+    
+    // Step 1: Verify current password by signing in
+    try {
+      // Using Firebase REST API to validate current password
+      const verifyResponse = await axios.post(`${FIREBASE_AUTH_SIGN_IN_URL}?key=${process.env.FIREBASE_API_KEY}`, {
+        email: email,
+        password: currentPassword,
+        returnSecureToken: true
+      });
+      
+      // If we got here, password is valid, get the refreshed idToken
+      const refreshedIdToken = verifyResponse.data.idToken;
+      
+      // Step 2: Change the password
+      const changeResponse = await axios.post(`${FIREBASE_AUTH_CHANGE_PASSWORD_URL}?key=${process.env.FIREBASE_API_KEY}`, {
+        idToken: refreshedIdToken,
+        password: newPassword,
+        returnSecureToken: false
+      });
+      
+      // Log password change for audit purposes
+      await admin.firestore().collection('password_changes').add({
+        userId: uid,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        // Don't store the actual passwords, only that it was changed
+        success: true
+      });
+      
+      // Send email notification about password change
+      const emailSubject = 'Password Changed - Sunshine Heights Apartment Portal';
+      const emailHtml = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4f46e5;">Password Changed</h2>
+          <p>Hello ${userData.fullName || userData.username || 'Resident'},</p>
+          <p>Your password for the Sunshine Heights Apartment Portal has been changed successfully.</p>
+          <p>Best regards,<br>Sunshine Heights Management</p>
+        </div>
+      `;
+
+      await sendEmail({
+        to: email,
+        subject: emailSubject,
+        html: emailHtml
+      });
+      
+      return res.json({ 
+        success: true, 
+        message: 'Password changed successfully' 
+      });
+      
+    } catch (error) {
+      // Check for specific authentication errors
+      if (error.response && error.response.data && error.response.data.error) {
+        const authError = error.response.data.error;
+        
+        if (authError.message === 'INVALID_PASSWORD') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Current password is incorrect' 
+          });
+        } else if (authError.message === 'PASSWORD_LOGIN_DISABLED') {
+          return res.status(400).json({ 
+            success: false, 
+            error: 'Password login is disabled for this account' 
+          });
+        }
+      }
+      
+      throw error; // Pass to general error handler
+    }
+    
+  } catch (error) {
+    console.error('Error changing password:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: 'Failed to change password',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
 });
 
 // Email helper functions

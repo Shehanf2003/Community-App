@@ -417,11 +417,13 @@ const ResourceBooking = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="flex items-center space-x-4 bg-white p-6 rounded-lg shadow-md">
-          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-          <p className="text-gray-700 font-medium">Loading resource booking system...</p>
-        </div>
+      <div className="min-h-screen bg-gradient-to-b from-white/70 to-white/90 backdrop-blur-sm py-6 px-4 sm:px-6 lg:px-8">
+      <div className="min-h-screen bg-gray-50 flex justify-center items-center min-h-screen bg-fixed bg-cover bg-center" style={{ backgroundImage: "url('/CU3.jpg')" }}>
+      <div className="flex items-center space-x-4 bg-white p-6 rounded-lg shadow-md">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
+        <p className="text-gray-700 font-medium">Loading resource booking system...</p>
+      </div>
+      </div>
       </div>
     );
   }

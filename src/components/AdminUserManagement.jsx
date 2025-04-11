@@ -551,6 +551,7 @@ const UserManagement = ({ currentUser }) => {
     };
 
     // Filter users based on search term and role
+    // Filter users based on search term and role
     const filteredUsers = users.filter(user => {
         const matchesSearch = 
             (user.username && user.username.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -560,7 +561,7 @@ const UserManagement = ({ currentUser }) => {
         
         const matchesRole = filterRole === 'all' || user.role === filterRole;
         
-        return matchesSearch && matchesRole;
+        return matchesSearch && matchesRole
     });
 
     // Get available addresses (not already assigned)
@@ -781,7 +782,6 @@ const UserManagement = ({ currentUser }) => {
                                 onChange={(e) => setFullName(e.target.value)}
                             />
                         </div>
-
                         <div>
                             <label className="block text-sm font-medium text-gray-700">
                                 Role
@@ -833,7 +833,7 @@ const UserManagement = ({ currentUser }) => {
             </div>
 
             <div className="bg-white shadow rounded-lg p-6">
-                <div className="flex justify-between items-center mb-4">
+                    <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold">Registered Users</h3>
                     <div className="flex space-x-2">
                         <div className="relative">
@@ -851,7 +851,7 @@ const UserManagement = ({ currentUser }) => {
                             value={filterRole}
                             onChange={(e) => setFilterRole(e.target.value)}
                         >
-                            <option value="all">All Roles</option>
+                            <option value="">All Users</option>
                             <option value="admin">Admin</option>
                             <option value="user">User</option>
                         </select>

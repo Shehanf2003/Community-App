@@ -5,15 +5,42 @@ const MaintenanceRequestImage = ({ imageUrl, altText = "Maintenance request imag
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // Add effect to reset loading state when imageUrl changes
+  
+  // Add useEffect to preload image when component mounts
   useEffect(() => {
     if (imageUrl) {
+      // Reset states when imageUrl changes
       setIsLoading(true);
       setError(null);
+      
+      // Preload the image
+      const img = new Image();
+      img.src = getTransformedUrl(imageUrl, 400); // Preload the thumbnail
+      
+      img.onload = () => {
+        setIsLoading(false);
+      };
+      
+      img.onerror = () => {
+        setIsLoading(false);
+        setError('Failed to load image');
+      };
     }
   }, [imageUrl]);
-
+  
+  const handleImageLoad = () => {
+    setIsLoading(false);
+  };
+  
+  const handleImageError = () => {
+    setIsLoading(false);
+    setError('Failed to load image');
+  };
+  
+  const toggleFullScreen = () => {
+    setIsFullScreen(!isFullScreen);
+  };
+  
   // Get Cloudinary transformations URL for different sizes
   const getTransformedUrl = (baseUrl, width) => {
     // If this is a Cloudinary URL, apply transformations
@@ -27,39 +54,12 @@ const MaintenanceRequestImage = ({ imageUrl, altText = "Maintenance request imag
     // Return original URL if not Cloudinary or if URL structure is unexpected
     return baseUrl;
   };
-
-  // Handle image load event
-  const handleImageLoad = () => {
-    setIsLoading(false);
-  };
-
-  // Handle image error event
-  const handleImageError = () => {
-    setIsLoading(false);
-    setError('Failed to load image');
-  };
-
-  // Toggle fullscreen view
-  const toggleFullScreen = () => {
-    setIsFullScreen(!isFullScreen);
-  };
-
-  // Download image
-  const downloadImage = (e) => {
-    e.stopPropagation();
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = 'maintenance-image.jpg';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // If no image URL is provided, don't render anything
+  
+  // Make sure we have a valid imageUrl before proceeding
   if (!imageUrl) {
     return null;
   }
-
+  
   // URLs for different sizes
   const thumbnailUrl = getTransformedUrl(imageUrl, 400);
   const fullSizeUrl = getTransformedUrl(imageUrl, 1200);
@@ -71,70 +71,80 @@ const MaintenanceRequestImage = ({ imageUrl, altText = "Maintenance request imag
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
         </div>
       )}
-
+      
       {error && (
-        <div className="text-red-500 text-sm p-2 bg-red-50 rounded">
+        <div className="text-red-500 text-sm">
           {error}
         </div>
       )}
-
+      
       <div className={isLoading ? 'hidden' : ''}>
-        <div className="relative group">
+        <div className="thread-image-container" style={{ width: '400px', height: '300px', overflow: 'hidden' }}>
           <img
-            src={thumbnailUrl}
+            src={isFullScreen ? fullSizeUrl : thumbnailUrl}
             alt={altText}
-            className="max-w-full rounded border border-gray-200 cursor-pointer"
+            className={`w-full h-full object-cover rounded ${isFullScreen ? 'cursor-zoom-out' : 'cursor-zoom-in'}`}
             onClick={toggleFullScreen}
             onLoad={handleImageLoad}
             onError={handleImageError}
             loading="lazy"
           />
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={toggleFullScreen}
-              className="bg-gray-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-opacity-100 mr-1"
-              title="View full size"
-            >
-              <Maximize size={16} />
-            </button>
-            <button
-              onClick={downloadImage}
-              className="bg-gray-800 bg-opacity-70 text-white p-1.5 rounded-full hover:bg-opacity-100"
-              title="Download image"
-            >
-              <Download size={16} />
-            </button>
-          </div>
         </div>
+        
+        {!isFullScreen && (
+          <div className="mt-1 text-xs text-gray-500 flex items-center space-x-2">
+            <button 
+              onClick={toggleFullScreen}
+              className="text-blue-600 hover:underline flex items-center"
+            >
+              <Maximize className="h-3 w-3 mr-1" />
+              View full size
+            </button>
+            
+            <a 
+              href={imageUrl}
+              download
+              className="text-blue-600 hover:underline flex items-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download className="h-3 w-3 mr-1" />
+              Download
+            </a>
+          </div>
+        )}
       </div>
-
+      
       {isFullScreen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={toggleFullScreen}
         >
-          <div className="relative max-w-4xl max-h-full">
+          <div className="max-w-4xl max-h-full overflow-auto">
             <img
               src={fullSizeUrl}
               alt={altText}
-              className="max-w-full max-h-[90vh] object-contain"
+              className="max-w-full max-h-[90vh] object-contain cursor-zoom-out"
               onClick={(e) => e.stopPropagation()}
             />
-            <button 
-              className="absolute top-4 right-4 bg-gray-800 bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-100"
-              onClick={toggleFullScreen}
-            >
-              <X size={20} />
-            </button>
-            <button
-              className="absolute bottom-4 right-4 bg-gray-800 bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-100"
-              onClick={(e) => {
-                e.stopPropagation();
-                downloadImage(e);
-              }}
-            >
-              <Download size={20} />
-            </button>
+            <div className="mt-2 text-white text-center flex justify-center space-x-4">
+              <button 
+                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 text-white flex items-center"
+                onClick={toggleFullScreen}
+              >
+                <X className="h-4 w-4 mr-1" />
+                Close
+              </button>
+              
+              <a 
+                href={imageUrl} 
+                download 
+                className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 text-white flex items-center"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </a>
+            </div>
           </div>
         </div>
       )}
