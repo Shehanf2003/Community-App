@@ -247,12 +247,15 @@ const MaintenanceRequest = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
+    <div className="min-h-screen bg-fixed bg-cover bg-center" style={{ backgroundImage: "url('/CU3.jpg')" }}>
+    <div className="min-h-screen bg-gradient-to-b from-white/70 to-white/90 backdrop-blur-sm py-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto">
+            <div className="bg-white shadow-xl rounded-xl overflow-hidden border border-gray-100">
+    
+      
         <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-          <div className="bg-blue-600 px-6 py-4">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6">
             <div className="flex items-center">
-              <Wrench className="h-6 w-6 text-white mr-2" />
               <h1 className="text-xl font-bold text-white">Maintenance Request</h1>
             </div>
           </div>
@@ -522,8 +525,12 @@ const MaintenanceRequest = () => {
         <div className="mt-6 text-center text-sm text-gray-500">
           <p>For urgent maintenance issues requiring immediate attention, please call our emergency line at <span className="font-medium">(555) 123-4567</span></p>
         </div>
+      
+      
       </div>
-    </div>
+      </div>
+      </div>
+      </div>
   );
 };
 

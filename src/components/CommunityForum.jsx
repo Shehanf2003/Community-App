@@ -257,10 +257,15 @@ const CommunityForum = () => {
   };
 
   return (
-    <div>
-      <div className="max-w-4xl mx-auto p-4">
-        <h1 className="text-2xl font-bold mb-6">Community Forum</h1>
-        
+    <div className="min-h-screen bg-fixed bg-cover bg-center" style={{ backgroundImage: "url('/CU3.jpg')" }}>
+    <div className="min-h-screen bg-gradient-to-b from-white/70 to-white/90 backdrop-blur-sm py-6 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-5xl mx-auto">
+            <div className="bg-white shadow-xl rounded-xl overflow-hidden border border-gray-100">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-6">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-white">Community Forum</h1>
+            </div>
+          </div>
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 relative">
             <span className="block sm:inline">{error}</span>
@@ -354,7 +359,7 @@ const CommunityForum = () => {
         </div>
 
         <div className="mb-4 flex justify-between items-center">
-          <h2 className="text-xl font-semibold">Discussions</h2>
+          <h2 className="text-xl font-semibold mb-4">Discussions</h2>
           <div className="flex items-center space-x-2">
             <label htmlFor="sort-filter" className="text-sm text-gray-600">Sort by:</label>
             <select
@@ -515,7 +520,11 @@ const CommunityForum = () => {
             ))}
           </div>
         )}
-      </div>
+    
+    
+    </div>
+    </div>
+    </div>
     </div>
   );
 };
