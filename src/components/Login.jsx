@@ -281,9 +281,9 @@ const Login = () => {
                                 <div className="slider-wrapper" style={{ transform: `translateX(-${currentSlide * 100}%)` }}>
                                     {/* Slide 1 */}
                                     <div className={`slide ${currentSlide === 0 ? 'active' : ''}`}>
-                                        
+                                    <div style={{ width: '600px', height: '400px', overflow: 'hidden' }}>
                                             <img src="/apartment2.jpg" alt="Sunset Apartments" />
-                                       
+                                            </div>
                                         <h3 className="apartment-title">Sunshine Heights</h3>
                                         <h4 className="apartment-subtitle">Luxury Living</h4>
                                        
@@ -291,9 +291,9 @@ const Login = () => {
                                     
                                     {/* Slide 2 */}
                                     <div className={`slide ${currentSlide === 1 ? 'active' : ''}`}>
-                                        
+                                    <div style={{ width: '600px', height: '400px', overflow: 'hidden' }}>
                                             <img src="/apartment6.jpg" alt="Lakeside Condos" />
-                                        
+                                            </div>
                                         <h3 className="apartment-title">Sunshine Heights</h3>
                                         <h4 className="apartment-subtitle">Waterfront Living</h4>
                                         
@@ -301,9 +301,9 @@ const Login = () => {
                                     
                                     {/* Slide 3 */}
                                     <div className={`slide ${currentSlide === 2 ? 'active' : ''}`}>
-                                        
+                                        <div style={{ width: '600px', height: '400px', overflow: 'hidden' }}>
                                             <img src="/apartment5.jpg" alt="Urban Lofts" />
-                                        
+                                            </div>
                                         <h3 className="apartment-title">Urban Lofts</h3>
                                         <h4 className="apartment-subtitle">Downtown Living</h4>
                                       
@@ -311,9 +311,9 @@ const Login = () => {
                                     
                                     {/* Slide 4 */}
                                     <div className={`slide ${currentSlide === 3 ? 'active' : ''}`}>
-                                        
+                                    <div style={{ width: '600px', height: '400px', overflow: 'hidden' }}>
                                             <img src="/apartment7.jpg" alt="Green Valley Residences" />
-                                        
+                                            </div>
                                         <h3 className="apartment-title">Sunshine Heights</h3>
                                         <h4 className="apartment-subtitle">Eco-Friendly Living</h4>
                                        
@@ -321,9 +321,9 @@ const Login = () => {
                                     
                                     {/* Slide 5 */}
                                     <div className={`slide ${currentSlide === 4 ? 'active' : ''}`}>
-                                        
+                                    <div style={{ width: '600px', height: '400px', overflow: 'hidden' }}>
                                             <img src="/apartment3.jpg" alt="Skyline Towers" />
-                                        
+                                            </div>
                                         <h3 className="apartment-title">Sunshine Heights</h3>
                                         <h4 className="apartment-subtitle">High-Rise Living</h4>
                                         
