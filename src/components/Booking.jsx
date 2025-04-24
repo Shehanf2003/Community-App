@@ -146,7 +146,6 @@ const ResourceBooking = () => {
     return () => clearInterval(interval);
   };
 
-  // Check for available time slots on the selected date
   const checkAvailableTimeSlots = async () => {
     if (!selectedResource || !bookingDate) return;
     
@@ -182,16 +181,16 @@ const ResourceBooking = () => {
       const businessHoursStart = 8; // 8AM
       const businessHoursEnd = 20; // 8PM
       
-      for (let hour = businessHoursStart; hour < businessHoursEnd; hour++) {
+      // Calculate the latest start time possible based on duration
+      const latestPossibleStartHour = businessHoursEnd - parseInt(duration);
+      
+      for (let hour = businessHoursStart; hour <= latestPossibleStartHour; hour++) {
         const slotStart = new Date(`${bookingDate}T${hour.toString().padStart(2, '0')}:00:00`);
         const slotEnd = new Date(slotStart);
         slotEnd.setHours(slotEnd.getHours() + parseInt(duration));
         
         // Skip past slots
         if (slotEnd <= new Date()) continue;
-        
-        // Skip slots that would end after business hours
-        if (slotEnd.getHours() > businessHoursEnd) continue;
         
         // Check if this slot conflicts with any existing bookings
         const isAvailable = !dayBookings.some(booking => {
@@ -363,6 +362,11 @@ const ResourceBooking = () => {
   const handleDurationChange = (newDuration) => {
     setDuration(newDuration);
     setBookingTime(''); // Reset time slot when duration changes
+    
+    // If a date is already selected, recalculate available time slots with the new duration
+    if (bookingDate && selectedResource) {
+      checkAvailableTimeSlots();
+    }
   };
 
   const formatDateTime = (timestamp) => {
