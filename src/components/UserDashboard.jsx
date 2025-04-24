@@ -159,6 +159,27 @@ const UserDashboard = () => {
         return categories[category] || 'bg-gray-100 text-gray-800';
     };
 
+    //  Function to render content with preserved formatting
+    const renderFormattedContent = (content) => {
+        if (!content) return null;
+        
+        // Split content by newlines to preserve line breaks
+        const paragraphs = content.split('\n').map((paragraph, i) => {
+            // If the paragraph is empty, return a line break
+            if (!paragraph.trim()) {
+                return <br key={i} />;
+            }
+            
+            return (
+                <p key={i} className="mb-2">
+                    {paragraph}
+                </p>
+            );
+        });
+        
+        return <div className="whitespace-pre-line">{paragraphs}</div>;
+    };
+
     return (
         <div className="min-h-screen bg-fixed bg-cover bg-center" style={{ backgroundImage: "url('/CU3.jpg')" }}>
             <div className="min-h-screen bg-gradient-to-b from-white/70 to-white/90 backdrop-blur-sm py-6 px-4 sm:px-6 lg:px-8">
@@ -300,9 +321,10 @@ const UserDashboard = () => {
                                                             </h3>
                                                         </div>
                                                         
-                                                        <p className={`mt-2 text-gray-600 ${expandedAnnouncement === announcement.id ? '' : 'line-clamp-2'}`}>
-                                                            {announcement.content}
-                                                        </p>
+                                                        
+                                                        <div className={`mt-2 text-gray-600 ${expandedAnnouncement === announcement.id ? '' : 'max-h-12 overflow-hidden'}`}>
+                                                            {renderFormattedContent(announcement.content)}
+                                                        </div>
                                                         
                                                         <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-gray-500">
                                                             <span className="flex items-center">
@@ -344,6 +366,8 @@ const UserDashboard = () => {
                                             
                                             {expandedAnnouncement === announcement.id && (
                                                 <div className="px-4 pb-4 border-t border-gray-100 pt-4 mt-2">
+                                                  
+                                                    
                                                     {announcement.imageUrl && (
                                                         <div className="mt-2 mb-4">
                                                             <img
