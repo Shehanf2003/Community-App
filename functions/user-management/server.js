@@ -329,9 +329,10 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
 
     // Verify the admin's ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const adminUid = decodedToken.uid;
     
     // Check if user is an admin in Firestore
-    const adminDoc = await admin.firestore().collection('users').doc(decodedToken.uid).get();
+    const adminDoc = await admin.firestore().collection('users').doc(adminUid).get();
     
     if (!adminDoc.exists || adminDoc.data().role !== 'admin') {
       return res.status(403).json({ 
@@ -353,7 +354,7 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
     const announcement = announcementDoc.data();
     
     // Get admin details for signature
-    const adminDetails = await getAdminDetails(decodedToken.uid);
+    const adminDetails = await getAdminDetails(adminUid);
 
     // Prepare email content
     const emailSubject = `Announcement: ${announcement.title || 'New Announcement'}`;
@@ -365,13 +366,12 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
         <p style="white-space: pre-line;">${announcement.content}</p>
       </div>
 
-            ${announcement.imageUrl ? `
+      ${announcement.imageUrl ? `
         <div style="margin: 15px 0;">
           <img src="${announcement.imageUrl}" alt="Announcement Image" style="max-width: 100%; border-radius: 5px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
         </div>
       ` : ''}
       
-      <p style="font-size: 0.9em; color: #6b7280;">Posted by: ${adminDetails.name}</p>
       <p style="font-size: 0.9em; color: #6b7280;">Date: ${new Date().toLocaleDateString()}</p>
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
       <p style="font-size: 0.8em; color: #6b7280;">This is an automated message from the Sunshine Heights Apartment Portal. Please do not reply to this email.</p>
@@ -382,9 +382,12 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
     let recipientEmails = [];
     
     if (announcement.targetType === 'all') {
-      // Send to all users
+      // Send to all users EXCEPT admins
       const usersSnapshot = await admin.firestore().collection('users').get();
-      recipientEmails = usersSnapshot.docs.map(doc => doc.data().email).filter(Boolean);
+      recipientEmails = usersSnapshot.docs
+        .filter(doc => doc.data().role !== 'admin') // Exclude admins
+        .map(doc => doc.data().email)
+        .filter(Boolean);
     } else if (announcement.targetType === 'specific' && Array.isArray(announcement.targetUsers) && announcement.targetUsers.length > 0) {
       // Send to specific users
       const promises = announcement.targetUsers.map(uid => 
@@ -403,7 +406,7 @@ app.post('/api/sendAnnouncementNotification', async (req, res) => {
 
     // Use BCC for privacy when sending to multiple recipients
     const emailResult = await sendEmail({
-      from: `Sunshine Heights Apartments <${adminDetails.email}>`,
+      from: `Sunshine Heights Apartments <${process.env.EMAIL_USER}>`,
       subject: emailSubject,
       html: emailHtml,
       bcc: recipientEmails.join(',')

@@ -46,11 +46,12 @@ const Announcements = ({ currentUser }) => {
     }, [currentUser]);
 
     // Effect to refresh announcements when filter changes
-    useEffect(() => {
-        if (currentUser?.uid) {
-            fetchAnnouncements();
-        }
-    }, [anncFilter, currentUser]);
+
+        useEffect(() => {
+            if (currentUser?.uid) {
+                fetchAnnouncements();
+            }
+        }, [anncFilter, currentUser]);
 
     // Effect to auto-dismiss success messages
     useEffect(() => {
@@ -170,101 +171,102 @@ const Announcements = ({ currentUser }) => {
     const handleImageUploaded = (imageData) => {
         setAnnouncementImage(imageData);
         setSuccess('Image uploaded successfully!');
-      };
-// Update the handleAnnouncementSubmit function to include image data
-const handleAnnouncementSubmit = async (e) => {
-    e.preventDefault();
+    };
     
-    if (!currentUser?.uid) {
-      setError('You must be logged in to post announcements');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setError('');
-    
-    try {
-      // Validate form
-      if (!newAnnouncement.trim()) {
-        setError('Announcement content cannot be empty');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      if (targetAudience === 'specific' && (!selectedUsers.length)) {
-        setError('Please select at least one recipient for targeted announcements');
-        setIsSubmitting(false);
-        return;
-      }
-      
-      const announcementData = {
-        title: announcementTitle.trim() || 'Announcement',
-        content: newAnnouncement.trim(),
-        createdBy: currentUser.uid,
-        createdAt: serverTimestamp(),
-        read: {},
-        targetType: targetAudience,
-        targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-        updatedAt: serverTimestamp(),
-        // Add image data if available
-        ...(announcementImage && {
-          imageUrl: announcementImage.imageUrl,
-          imageId: announcementImage.imageId
-        })
-      };
-  
-      let docRef;
-      
-      if (editMode && currentAnnouncementId) {
-        // Update existing announcement
-        docRef = doc(db, 'announcements', currentAnnouncementId);
-        await updateDoc(docRef, {
-          title: announcementTitle.trim() || 'Announcement',
-          content: newAnnouncement.trim(),
-          targetType: targetAudience,
-          targetUsers: targetAudience === 'specific' ? selectedUsers : [],
-          updatedAt: serverTimestamp(),
-          // Add or update image data if available
-          ...(announcementImage && {
-            imageUrl: announcementImage.imageUrl,
-            imageId: announcementImage.imageId
-          })
-        });
-        setSuccess('Announcement updated successfully!');
+    // Update the handleAnnouncementSubmit function to include image data
+    const handleAnnouncementSubmit = async (e) => {
+        e.preventDefault();
         
-      } else {
-        // Create new announcement
-        docRef = await addDoc(collection(db, 'announcements'), announcementData);
-        
-        // Send email notification for new announcements
-        const emailResult = await sendAnnouncementEmail(docRef.id);
-        
-        let successMessage = 'Announcement posted successfully!';
-        if (emailResult.success) {
-          successMessage += ' Email notifications sent.';
-        } else {
-          successMessage += ' However, email notifications could not be sent.';
-          console.warn('Email sending failed:', emailResult.error);
+        if (!currentUser?.uid) {
+          setError('You must be logged in to post announcements');
+          return;
         }
         
-        setSuccess(successMessage);
+        setIsSubmitting(true);
+        setError('');
         
-        if (!formPinned) {
-          setShowForm(false);
-        }
-      }
+        try {
+          // Validate form
+          if (!newAnnouncement.trim()) {
+            setError('Announcement content cannot be empty');
+            setIsSubmitting(false);
+            return;
+          }
+          
+          if (targetAudience === 'specific' && (!selectedUsers.length)) {
+            setError('Please select at least one recipient for targeted announcements');
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const announcementData = {
+            title: announcementTitle.trim() || 'Announcement',
+            content: newAnnouncement.trim(),
+            createdBy: currentUser.uid,
+            createdAt: serverTimestamp(),
+            read: {},
+            targetType: targetAudience,
+            targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+            updatedAt: serverTimestamp(),
+            // Add image data if available
+            ...(announcementImage && {
+              imageUrl: announcementImage.imageUrl,
+              imageId: announcementImage.imageId
+            })
+          };
       
-      resetForm();
-      await fetchAnnouncements(); // Await to ensure we get updated data
-    } catch (err) {
-      console.error('Error submitting announcement:', err);
-      setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+          let docRef;
+          
+          if (editMode && currentAnnouncementId) {
+            // Update existing announcement
+            docRef = doc(db, 'announcements', currentAnnouncementId);
+            await updateDoc(docRef, {
+              title: announcementTitle.trim() || 'Announcement',
+              content: newAnnouncement.trim(),
+              targetType: targetAudience,
+              targetUsers: targetAudience === 'specific' ? selectedUsers : [],
+              updatedAt: serverTimestamp(),
+              // Add or update image data if available
+              ...(announcementImage && {
+                imageUrl: announcementImage.imageUrl,
+                imageId: announcementImage.imageId
+              })
+            });
+            setSuccess('Announcement updated successfully!');
+            
+          } else {
+            // Create new announcement
+            docRef = await addDoc(collection(db, 'announcements'), announcementData);
+            
+            // Send email notification for new announcements
+            const emailResult = await sendAnnouncementEmail(docRef.id);
+            
+            let successMessage = 'Announcement posted successfully!';
+            if (emailResult.success) {
+              successMessage += ' Email notifications sent.';
+            } else {
+              successMessage += ' However, email notifications could not be sent.';
+              console.warn('Email sending failed:', emailResult.error);
+            }
+            
+            setSuccess(successMessage);
+            
+            if (!formPinned) {
+              setShowForm(false);
+            }
+          }
+          
+          resetForm();
+          await fetchAnnouncements(); // Await to ensure we get updated data
+        } catch (err) {
+          console.error('Error submitting announcement:', err);
+          setError('Failed to ' + (editMode ? 'update' : 'post') + ' announcement: ' + err.message);
+        } finally {
+          setIsSubmitting(false);
+        }
+    };
 
-      const sendAnnouncementEmail = async (announcementId) => {
+    const sendAnnouncementEmail = async (announcementId) => {
         try {
           // Get current user's ID token
           const idToken = await getIdToken(auth.currentUser);
@@ -292,9 +294,9 @@ const handleAnnouncementSubmit = async (e) => {
           console.error('Error sending announcement email:', error);
           return { success: false, error: error.message };
         }
-      };
+    };
 
-      const resetForm = () => {
+    const resetForm = () => {
         setNewAnnouncement('');
         setAnnouncementTitle('');
         setTargetAudience('all');
@@ -303,9 +305,9 @@ const handleAnnouncementSubmit = async (e) => {
         setEditMode(false);
         setCurrentAnnouncementId(null);
         setAnnouncementImage(null); // Reset image state
-      };
+    };
 
-      const handleEditAnnouncement = (announcement) => {
+    const handleEditAnnouncement = (announcement) => {
         setAnnouncementTitle(announcement.title || '');
         setNewAnnouncement(announcement.content);
         setTargetAudience(announcement.targetType || 'all');
@@ -327,7 +329,7 @@ const handleAnnouncementSubmit = async (e) => {
         setCurrentAnnouncementId(announcement.id);
         setShowForm(true);
         setFormPinned(true);
-      };
+    };
 
     const confirmDeleteAnnouncement = (announcement) => {
         setConfirmDelete(announcement);
@@ -684,12 +686,6 @@ const handleAnnouncementSubmit = async (e) => {
                                                             {user.email && <div className="text-sm text-gray-500">{user.email}</div>}
                                                         </div>
                                                     </div>
-                                                    
-                                                    {user.role === 'admin' && (
-                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                                            Admin
-                                                        </span>
-                                                    )}
                                                 </div>
                                             ))
                                     )}
