@@ -1,18 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
+import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock } from 'lucide-react';
 import { getAuth } from 'firebase/auth';
+import { use } from 'react';
 
-const AdminMaintenanceRequests = ({ currentUser }) => {
-    const [maintenanceRequests, setMaintenanceRequests] = useState({});
+const MaintenanceRequests = ({ currentUser }) => {
+    const [maintenanceRequests, setMaintenanceRequests] = useState([]);
     const [filteredRequests, setFilteredRequests] = useState([]);
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [replyText, setReplyText] = useState('');
     const [loading, setLoading] = useState(true);
-
+    const [actionLoading, setActionLoading] = useState(false);
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [priorityFilter, setPriorityFilter] = useState('All');
     const [showFilters, setShowFilters] = useState(false);
     const [sortOrder, setSortOrder] = useState('newest'); // 'newest', 'oldest', 'priority'
-    
+    const [requestToDelete, setRequestToDelete] = useState(null);
+    const [quickReplies, setQuickReplies] = useState([
+        "We've received your maintenance request and will address it soon.",
+        "A technician has been assigned to your request and will visit within 48 hours.",
+        "Your maintenance issue has been resolved. Please let us know if you need further assistance.",
+        "We need more information about your request. Could you please provide additional details?"
+    ])
+    const [expandedRequests, setExpandedRequests] = useState({});
+
     const db = getFirestore();
     const auth = getAuth();
 
