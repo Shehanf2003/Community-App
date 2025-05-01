@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
 import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock } from 'lucide-react';
-import { getAuth } from 'firebase/auth';
-import { use } from 'react';
+import { getIdToken, getAuth } from 'firebase/auth';
 
 const MaintenanceRequests = ({ currentUser }) => {
     const [maintenanceRequests, setMaintenanceRequests] = useState([]);
@@ -101,11 +100,11 @@ const MaintenanceRequests = ({ currentUser }) => {
     const fetchMaintenanceRequests = async () => {
         setLoading(true);
         setError('');
-
         try{
             const q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
             const querySnapshot = await getDocs(q);
             
+            //Process each request document
             const requestsPromises = querySnapshot.docs.map(async docSnapshot => {
                 const requestData = docSnapshot.data();
                 const requestWithId = {
@@ -113,16 +112,19 @@ const MaintenanceRequests = ({ currentUser }) => {
                     ...requestData
                 };
 
-                if (!requestData.fullName && requestData.userID){
+                // If there's no fullName but we have a userId, try to fetch the user's fullName
+                if (!requestData.fullName && requestData.userId){
                     try{
                         const userDocRef = doc(db, 'users', requestData.userId); 
                         const userSnapshot = await getDoc(userDocRef); 
+                        
                         if (userSnapshot.exists()) { 
                             const userData = userSnapshot.data();
                             requestWithId.fullName = userData.fullName || userData.username || '';
                         }
                     } catch (error) {
                         console.error("Error fetching user details:", error);
+                        // Continue with the request data we have
                     }
                 }
             
@@ -138,7 +140,65 @@ const MaintenanceRequests = ({ currentUser }) => {
         }
     };
 
+    const handleMaintenanceStatusChange = async (requestId, newStatus) => {
+        setActionLoading(true);
+        try {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            await updateDoc(requestRef, {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            });
 
+            // Create a notification for the user when status changes to Completed
+            if (newStatus === 'Completed') {
+                const request = maintenanceRequests.find(r => r.id === requestId);
+                if (request) {
+                    const notificationRef = collection(db, 'notifications');
+                    await addDoc(notificationRef, {
+                        userId: request.userId,
+                        type: 'maintenance_status',
+                        requestId: requestId,
+                        content: `Your maintenance request "${request.title}" has been completed.`,
+                        read: false,
+                        createdAt: serverTimestamp(),
+                        maintenanceTitle: request.title
+                    });
+                }
+            }
+
+            await fetchMaintenanceRequests(); // Refresh the list
+            setSuccess(`Status updated to "${newStatus}" successfully`);
+
+            //Auto dismiss success message after 3 seconds
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            setError('Error updating status: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handlePriorityChange = async (requestId, newPriority) => {
+        setActionLoading(true);
+        try {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            await updateDoc(requestRef, {
+                priority: newPriority,
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid
+            });
+            await fetchMaintenanceRequests(); // Refresh the list
+            setSuccess(`Priority updated to "${newPriority}" successfully`);
+            
+            // Auto dismiss success message after 3 seconds
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            setError('Error updating priority: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
 
     return (
