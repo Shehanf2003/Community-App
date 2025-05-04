@@ -1,265 +1,348 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, addDoc, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
-import UserManagement from './AdminUserManagement';
-import Announcements from './AdminAnnouncements';
-import MaintenanceRequests from './AdminMaintenanceRequests';
-import { Users, Wrench, Megaphone, LogOut, AlertTriangle, CheckCircle, X, BarChart2 } from 'lucide-react';
+import { sendAnnouncementEmail } from '../utils/emailService';
+import { Trash2 } from "lucide-react";
 
 const AdminDashboard = () => {
-    const [activeTab, setActiveTab] = useState('users');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [role, setRole] = useState('user');
+    const [users, setUsers] = useState([]);
+    const [announcements, setAnnouncements] = useState([]);
+    const [maintenanceRequests, setMaintenanceRequests] = useState([]);
+    const [newAnnouncement, setNewAnnouncement] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [isPanelExpanded, setIsPanelExpanded] = useState(true);
-    
-    // Array of valid tabs with icons and labels
-    const tabs = [
-        { id: 'dashboard', label: 'Dashboard', icon: <BarChart2 size={20} /> },
-        { id: 'users', label: 'User Management', icon: <Users size={20} /> },
-        { id: 'maintenance', label: 'Maintenance Requests', icon: <Wrench size={20} /> },
-        { id: 'announcements', label: 'Announcements', icon: <Megaphone size={20} /> }
-    ];
-    
-    const { currentUser, logout } = useAuth();
 
-    // Auto-dismiss success message
-    useEffect(() => {
-        if (success) {
-            const timer = setTimeout(() => {
-                setSuccess('');
-            }, 5000);
-            return () => clearTimeout(timer);
-        }
-    }, [success]);
+    const { currentUser } = useAuth();
+    const auth = getAuth();
+    const db = getFirestore();
 
-    // Check URL hash for direct tab access
     useEffect(() => {
-        const hash = window.location.hash.replace('#', '');
-        if (hash && tabs.some(tab => tab.id === hash)) {
-            setActiveTab(hash);
-        }
+        fetchUsers();
+        fetchAnnouncements();
+        fetchMaintenanceRequests();
     }, []);
 
-    // Update URL hash when tab changes for bookmarkable tabs
-    useEffect(() => {
-        window.location.hash = activeTab;
-    }, [activeTab]);
-
-    const handleLogout = async () => {
+    const fetchUsers = async () => {
         try {
-            setIsLoading(true);
-            await logout();
-            // Using window.location.href instead of navigate since we don't know which router is being used
-            window.location.href = '/login';
-        } catch (error) {
-            setError('Failed to logout: ' + error.message);
-            setIsLoading(false);
+            const usersCollection = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersCollection);
+            const usersList = usersSnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setUsers(usersList);
+        } catch (err) {
+            setError('Error fetching users: ' + err.message);
         }
     };
 
-    const handleTabClick = (tabId) => {
-        if (tabId !== activeTab) {
-            setActiveTab(tabId);
-            // Clear messages when switching tabs
+    const fetchMaintenanceRequests = async () => {
+        try {
+            const q = query(collection(db, 'maintenance_requests'), orderBy('createdAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+            const requestsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMaintenanceRequests(requestsList);
+        } catch (err) {
+            setError('Error fetching maintenance requests: ' + err.message);
+        }
+    };
+
+
+    const fetchAnnouncements = async () => {
+        try {
+            const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+            const querySnapshot = await getDocs(q);
+            const announcementsList = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setAnnouncements(announcementsList);
+        } catch (err) {
+            setError('Error fetching announcements: ' + err.message);
+        }
+    };
+
+    const handleRegisterUser = async (e) => {
+        e.preventDefault();
+        setError('');
+        setSuccess('');
+        setLoading(true);
+
+        try {
+            const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                email,
+                password
+            );
+
+            await setDoc(doc(db, 'users', userCredential.user.uid), {
+                email,
+                role,
+                createdBy: currentUser.uid,
+                createdAt: new Date().toISOString()
+            });
+
+            setSuccess('User registered successfully!');
+            setEmail('');
+            setPassword('');
+            setRole('user');
+            fetchUsers();
+        } catch (err) {
+            setError('Failed to register user: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteUser = async (user) => {
+        try {
             setError('');
             setSuccess('');
+            setLoading(true);
+            
+            // Prevent deleting the current user
+            if (user.id === currentUser.uid) {
+                setError('Cannot delete the current user');
+                return;
+            }
+
+            await deleteDoc(doc(db, 'users', user.id));
+            setSuccess('User deleted successfully!');
+            fetchUsers();
+        } catch (err) {
+            setError('Failed to delete user: ' + err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAnnouncementSubmit = async (e) => {
+        e.preventDefault();
+        setIsSubmitting(true);
+        setError('');
+        setSuccess('');
+    
+        try {
+            // Create announcement in Firebase
+            const announcementRef = await addDoc(collection(db, 'announcements'), {
+                content: newAnnouncement,
+                createdBy: currentUser.uid,
+                createdAt: serverTimestamp(),
+                read: {}
+            });
+    
+            // Send emails to all users
+            const emailResults = await sendAnnouncementEmail(newAnnouncement);
+            
+            // Track email delivery status
+            await trackAnnouncementDelivery(announcementRef.id, emailResults);
+    
+            setSuccess('Announcement posted and sent to ${emailResults.totalSent} users successfully!');
+            setNewAnnouncement('');
+            fetchAnnouncements();
+            
+        } catch (err) {
+            setError('Failed to post announcement: ' + err.message);
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-100 flex">
-            {/* Sidebar */}
-            <div className={`${isPanelExpanded ? 'w-64' : 'w-20'} bg-indigo-800 text-white transition-all duration-300 ease-in-out flex flex-col`}>
-                <div className="p-4 border-b border-indigo-700 flex items-center justify-between">
-                    {isPanelExpanded ? (
-                        <h1 className="text-xl font-bold">Admin Panel</h1>
-                    ) : (
-                        <div className="mx-auto">
-                            <img src="/cu1.png" alt="Admin Logo" className="w-10 h-10" />
-                        </div>
-                    )}
-                    <button 
-                        onClick={() => setIsPanelExpanded(!isPanelExpanded)}
-                        className="text-indigo-200 hover:text-white"
-                    >
-                        {isPanelExpanded ? (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-                            </svg>
-                        ) : (
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                            </svg>
-                        )}
-                    </button>
-                </div>
+        <div className="min-h-screen bg-gray-100 py-6 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-4xl mx-auto">
+                <div className="bg-white shadow rounded-lg p-6">
+                    <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
 
-                <nav className="flex-1 pt-4">
-                    <ul>
-                        {tabs.map((tab) => (
-                            <li key={tab.id}>
-                                <button
-                                    onClick={() => handleTabClick(tab.id)}
-                                    className={`flex items-center w-full py-3 px-4 ${
-                                        activeTab === tab.id
-                                            ? 'bg-indigo-900 text-white'
-                                            : 'text-indigo-200 hover:bg-indigo-700'
-                                    } transition-colors`}
-                                >
-                                    <span className="mr-3">{tab.icon}</span>
-                                    {isPanelExpanded && <span>{tab.label}</span>}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </nav>
-
-                <div className="p-4 border-t border-indigo-700">
-                    <button
-                        onClick={handleLogout}
-                        disabled={isLoading}
-                        className="flex items-center w-full py-2 px-3 rounded hover:bg-indigo-700 text-indigo-200 hover:text-white transition-colors"
-                    >
-                        <LogOut size={18} className="mr-3" />
-                        {isPanelExpanded && (
-                            isLoading ? 'Logging out...' : 'Logout'
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex-1 overflow-auto">
-                <header className="bg-white shadow-sm">
-                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-2xl font-bold text-gray-900">
-                            {tabs.find(tab => tab.id === activeTab)?.label || 'Admin Dashboard'}
-                        </h1>
-
-                        <div className="flex items-center space-x-4">
-                            <div className="text-sm text-gray-600">
-                                Logged in as: <span className="font-medium">{currentUser.email}</span>
-                            </div>
-                        </div>
-                    </div>
-                </header>
-
-                <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    {/* Notifications */}
                     {error && (
-                        <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-center">
-                            <AlertTriangle size={20} className="text-red-500 mr-3" />
-                            <div className="flex-1 text-red-700">{error}</div>
-                            <button 
-                                onClick={() => setError('')}
-                                className="text-red-500 hover:text-red-700"
-                                aria-label="Dismiss"
-                            >
-                                <X size={20} />
-                            </button>
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                            {error}
                         </div>
                     )}
 
                     {success && (
-                        <div className="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-md flex items-center">
-                            <CheckCircle size={20} className="text-green-500 mr-3" />
-                            <div className="flex-1 text-green-700">{success}</div>
-                            <button 
-                                onClick={() => setSuccess('')}
-                                className="text-green-500 hover:text-green-700"
-                                aria-label="Dismiss"
-                            >
-                                <X size={20} />
-                            </button>
+                        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                            {success}
                         </div>
                     )}
 
-                    {/* Dashboard Tab */}
-                    {activeTab === 'dashboard' && (
-                        <div className="bg-white shadow rounded-lg p-6">
-                            <h2 className="text-xl font-semibold mb-4">Admin Dashboard Overview</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                                    <div className="flex items-center">
-                                        <div className="p-3 rounded-full bg-indigo-100 mr-4">
-                                            <Users size={24} className="text-indigo-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-indigo-800 font-medium">User Management</p>
-                                            <button 
-                                                onClick={() => setActiveTab('users')}
-                                                className="text-xs text-indigo-600 hover:text-indigo-800 mt-1"
-                                            >
-                                                View users →
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="bg-green-50 p-4 rounded-lg border border-green-100">
-                                    <div className="flex items-center">
-                                        <div className="p-3 rounded-full bg-green-100 mr-4">
-                                            <Megaphone size={24} className="text-green-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-green-800 font-medium">Announcements</p>
-                                            <button 
-                                                onClick={() => setActiveTab('announcements')}
-                                                className="text-xs text-green-600 hover:text-green-800 mt-1"
-                                            >
-                                                Manage announcements →
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
-                                    <div className="flex items-center">
-                                        <div className="p-3 rounded-full bg-amber-100 mr-4">
-                                            <Wrench size={24} className="text-amber-600" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm text-amber-800 font-medium">Maintenance Requests</p>
-                                            <button 
-                                                onClick={() => setActiveTab('maintenance')}
-                                                className="text-xs text-amber-600 hover:text-amber-800 mt-1"
-                                            >
-                                                View requests →
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                    {/* Tab Navigation */}
+                    <div className="flex border-b mb-6">
+
+                        <button
+                            className={`px-4 py-2 mr-2 ${activeTab === 'maintenance' ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-600'}`}
+                            onClick={() => setActiveTab('maintenance')}
+                        >
+                            Maintenance Requests
+                        </button>
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="bg-gray-50 p-6 rounded-lg mb-6">
+                        <h3 className="text-xl font-semibold mb-4">Register New User</h3>
+                        <form onSubmit={handleRegisterUser} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    email
+                                </label>
+                                <input
+                                    type="email"
+                                    required
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                />
                             </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Password
+                                </label>
+                                <input
+                                    type="password"
+                                    required
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    value={password}
+                                    onChange={(e) => setPassword(e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Role
+                                </label>
+                                <select
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    value={role}
+                                    onChange={(e) => setRole(e.target.value)}
+                                >
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                                {loading ? 'Registering...' : 'Register User'}
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="bg-white shadow rounded-lg p-6 mb-6">
+                        <h3 className="text-xl font-semibold mb-4">Registered Users</h3>
+                        {users.map((user) => (
+                            <div 
+                                key={user.id} 
+                                className="flex justify-between items-center bg-gray-50 p-4 rounded-lg mb-2"
+                            >
+                                <div>
+                                    <span className="font-medium">{user.email}</span>
+                                    <span className="text-sm text-gray-500 ml-2">({user.role})</span>
+                                </div>
+                                <button 
+                                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
+                                    onClick={() => handleDeleteUser(user)}
+                                    disabled={loading || user.id === currentUser.uid}
+                                >
+                                    <Trash2 className="h-5 w-5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-white shadow rounded-lg p-6">
+                        <h3 className="text-xl font-semibold mb-4">Post Announcement</h3>
+                        <form onSubmit={handleAnnouncementSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Announcement Contents
+                                </label>
+                                <textarea
+                                    required
+                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+                                    rows="4"
+                                    value={newAnnouncement}
+                                    onChange={(e) => setNewAnnouncement(e.target.value)}
+                                    placeholder="Type your announcement here..."
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                                {isSubmitting ? 'Posting...' : 'Post Announcement'}
+                            </button>
+                        </form>
+                    </div>
+
+                    <div className="mt-6">
+                        <h3 className="text-xl font-semibold mb-4">Recent Announcements</h3>
+                        <div className="space-y-4">
+                            {announcements.map((announcement) => (
+                                <div key={announcement.id} className="border rounded-lg p-4">
+                                    <p className="text-gray-900 mb-2">{announcement.content}</p>
+                                    <p className="text-sm text-gray-500 mt-2">
+                                        Posted on {announcement.createdAt?.toDate().toLocaleDateString()}
+                                    </p>
+                                </div>
+                            ))}
                         </div>
-                    )}
+                    </div>
+                </div>
 
-                    {/* User Management Tab */}
-                    {activeTab === 'users' && (
-                        <UserManagement 
-                            currentUser={currentUser}
-                            setError={setError}
-                            setSuccess={setSuccess} 
-                        />
-                    )}
+                     {/* Complete maintenance req tab Content */}             
+                {activeTab === 'maintenance' && (
+                    <div className="space-y-6">
+                        <div className="space-y-4">
+                            <h3 className="text-xl font-semibold mb-4">Maintenance Requests</h3>
+                                        
+                            {maintenanceRequests.map((request) => (
+                                <div key={request.id} className="bg-white shadow rounded-lg p-4 space-y-3">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h4 className="font-medium">{request.title}</h4>
+                                            <p className="text-sm text-gray-500">
+                                                Submitted by: {request.userName} | Location: {request.location}
+                                            </p>
+                                            <p className="text-sm text-gray-500">
+                                                Priority: {request.priority} | Status: {request.status}
+                                            </p>
+                                        </div>
+                                            <select
+                                                className="text-sm border rounded-md p-1"
+                                                value={request.status}
+                                                onChange={(e) => handleMaintenanceStatusChange(request.id, e.target.value)}
+                                                disabled={loading}
+                                            >
+                                                <option value="Pending">Pending</option>
+                                                <option value="In Progress">In Progress</option>
+                                                <option value="Completed">Completed</option>
+                                                <option value="Cancelled">Cancelled</option>
+                                            </select>
+                                    </div>
+                                                
+                                                <p className="text-gray-700">{request.description}</p>
+                                                
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
-                    {/* Announcements Tab */}
-                    {activeTab === 'announcements' && (
-                        <Announcements 
-                            currentUser={currentUser} 
-                            setError={setError}
-                            setSuccess={setSuccess}
-                        />
-                    )}
-                                    
-                    {/* Maintenance Requests Tab */}
-                    {activeTab === 'maintenance' && (
-                        <MaintenanceRequests 
-                            currentUser={currentUser} 
-                            setError={setError}
-                            setSuccess={setSuccess}
-                        />
-                    )}
-                </main>
+
             </div>
         </div>
     );
