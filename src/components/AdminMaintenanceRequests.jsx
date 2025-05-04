@@ -267,7 +267,7 @@ const MaintenanceRequests = ({ currentUser }) => {
           setActionLoading(false);
         }
       };
-      //fix this
+      //1
       const sendMaintenanceReplyEmail = async (requestId, commentId) => {
         try {
             const idToken = await getIdToken(auth.currentUser);
@@ -291,7 +291,59 @@ const MaintenanceRequests = ({ currentUser }) => {
             return { success: false, error: error.message };
         }
     };
+    //1
+    //2
+    const handleDeleteRequest = async (requestId) => {
+        setActionLoading(true);
+        try {
+            const requestRef = doc(db, 'maintenance_requests', requestId);
+            await updateDoc(requestRef, {
+                status: 'Cancelled',
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser.uid,
+                isCancelled: true
+            });
     
+            setRequestToDelete(null);
+            await fetchMaintenanceRequests();
+            setSuccess('Request cancelled successfully');
+            setTimeout(() => setSuccess(''), 3000);
+        } catch (error) {
+            setError('Error cancelling request: ' + error.message);
+        } finally {
+            setActionLoading(false);
+        }
+    };
+    //2 
+    //3
+    const resetFilters = () => {
+        setStatusFilter('All');
+        setPriorityFilter('All');
+        setSearchTerm('');
+        setSortOrder('newest');
+    };
+    
+    const toggleRequestExpansion = (requestId) => {
+        setExpandedRequests(prev => ({
+            ...prev,
+            [requestId]: !prev[requestId]
+        }));
+    };
+    
+    const formatDate = (timestamp) => {
+        if (!timestamp) return 'Unknown date';
+        const date = timestamp instanceof Date ? timestamp : timestamp.toDate();
+        if (isNaN(date)) return 'Invalid date';
+    
+        return new Intl.DateTimeFormat('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    };
+//3       
     return (
         <div className="p-4">
             <h1 className="text-xl font-semibold">Maintenance Requests</h1>
