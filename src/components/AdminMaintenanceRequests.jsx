@@ -267,7 +267,31 @@ const MaintenanceRequests = ({ currentUser }) => {
           setActionLoading(false);
         }
       };
-
+      //fix this
+      const sendMaintenanceReplyEmail = async (requestId, commentId) => {
+        try {
+            const idToken = await getIdToken(auth.currentUser);
+    
+            const response = await fetch('/api/sendMaintenanceReplyNotification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idToken, requestId, commentId })
+            });
+    
+            const data = await response.json();
+    
+            if (!response.ok) {
+                console.error('Error sending maintenance reply email:', data.error);
+                return { success: false, error: data.error };
+            }
+    
+            return { success: true };
+        } catch (error) {
+            console.error('Error sending maintenance reply email:', error);
+            return { success: false, error: error.message };
+        }
+    };
+    
     return (
         <div className="p-4">
             <h1 className="text-xl font-semibold">Maintenance Requests</h1>
