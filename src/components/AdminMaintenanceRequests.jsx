@@ -200,6 +200,73 @@ const MaintenanceRequests = ({ currentUser }) => {
         }
     };
 
+    const handleMaintenanceReply = async (requestId, replyText) => {
+        if (!replyText.trim()) return;
+        setActionLoading(true);
+        
+        try {
+          const requestRef = doc(db, 'maintenance_requests', requestId);
+          const request = maintenanceRequests.find(r => r.id === requestId);
+          
+          // Create a new Date object for the comment timestamp
+          const currentDate = new Date();
+          
+          // Create comment ID for reference
+          const commentId = `comment_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+          
+          // Add the reply to maintenance request with a regular timestamp
+          await updateDoc(requestRef, {
+            comments: [...(request.comments || []), {
+              id: commentId,
+              content: replyText,
+              createdAt: currentDate,
+              createdBy: currentUser.uid,
+              isAdminReply: true
+            }],
+            lastUpdated: serverTimestamp() // This is fine outside the array
+          });
+      
+          // Create notification for the user
+          const notificationRef = collection(db, 'notifications');
+          await addDoc(notificationRef, {
+            userId: request.userId,
+            type: 'maintenance_reply',
+            requestId: requestId,
+            content: replyText,
+            read: false,
+            createdAt: serverTimestamp(), // This is fine for a new document
+            maintenanceTitle: request.title
+          });
+          
+          // Send email notification
+          const emailResult = await sendMaintenanceReplyEmail(requestId, commentId);
+      
+          // Clear the reply text for this request
+          if (selectedRequest === requestId) {
+            setReplyText('');
+            setSelectedRequest(null);
+          }
+      
+          await fetchMaintenanceRequests();
+          
+          let successMessage = 'Reply sent successfully';
+          if (emailResult.success) {
+            successMessage += ' and email notification sent to the user.';
+          } else {
+            successMessage += '. However, email notification could not be sent.';
+            console.warn('Email sendng failed:', emailResult.error);
+          }
+          
+          setSuccess(successMessage);
+          
+          // Auto dismiss success message after 3 seconds
+          setTimeout(() => setSuccess(''), 5000);
+        } catch (error) {
+          setError('Error sending reply: ' + error.message);
+        } finally {
+          setActionLoading(false);
+        }
+      };
 
     return (
         <div className="p-4">
