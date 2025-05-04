@@ -343,7 +343,33 @@ const MaintenanceRequests = ({ currentUser }) => {
             minute: '2-digit'
         }).format(date);
     };
-//3       
+//3- 
+//4
+const getStatuColor = (status) => {
+    switch(status) {
+        case 'Pending': return 'bg-yellow-100 text-yellow-800';
+        case 'In Progress': return 'bg-blue-100 text-blue-800';
+        case 'Completed': return 'bg-green-100 text-green-800';
+        case 'Cancelled': return 'bg-red-100 text-red-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const getPriorityColor = (priority) => {
+    switch(priority) {
+        case 'Emergency': return 'bg-red-100 text-red-800';
+        case 'High Priority': return 'bg-orange-100 text-orange-800';
+        case 'Medium Priority': return 'bg-yellow-100 text-yellow-800';
+        case 'Low Priority': return 'bg-blue-100 text-blue-800';
+        case 'Unassigned': return 'bg-gray-100 text-gray-800';
+        default: return 'bg-gray-100 text-gray-800';
+    }
+};
+
+const useQuickReply = (reply) => {
+    setReplyText(reply);
+};
+//4-
     return (
         <div className="p-4">
             <h1 className="text-xl font-semibold">Maintenance Requests</h1>
