@@ -565,6 +565,10 @@ const MaintenanceRequests = ({ currentUser }) => {
                     </button>
                 </div>
             </div>
+
+
+        </div>
+
     );
 };
 
