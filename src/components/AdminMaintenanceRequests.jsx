@@ -566,9 +566,291 @@ const MaintenanceRequests = ({ currentUser }) => {
                 </div>
             </div>
 
-
+            {/* Maintenance Requests List */}
+            <div className="space-y-4">
+                {loading ? (
+                    <div className="bg-white shadow rounded-lg p-8 text-center">
+                        <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+                        <p className="text-gray-500">Loading maintenance requests...</p>
+                    </div>
+                ) : filteredRequests.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-4">
+                        {filteredRequests.map((request) => (
+                            <div key={request.id} className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+                                <div className="p-4">
+                                    <div className="flex flex-col md:flex-row justify-between">
+                                        <div className="flex-grow mb-2 md:mb-0">
+                                            <div className="flex items-center">
+                                                <h3 className="font-semibold text-lg text-gray-900">{request.title}</h3>
+                                                <button
+                                                    onClick={() => toggleRequestExpansion(request.id)}
+                                                    className="ml-2 text-gray-400 hover:text-gray-600"
+                                                    aria-label={expandedRequests[request.id] ? "Collapse details" : "Expand details"}
+                                                >
+                                                    <svg className={`h-5 w-5 transform transition-transform ${expandedRequests[request.id] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(request.status)}`}>
+                                                    {request.status}
+                                                </span>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPriorityColor(request.priority)}`}>
+                                                    {request.priority}
+                                                </span>
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                    <Calendar className="mr-1 h-3 w-3" />
+                                                    {request.createdAt ? formatDate(request.createdAt) : 'Unknown date'}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3 text-sm text-gray-500">
+                                                <div className="flex items-center">
+                                                    <UserCircle className="h-4 w-4 mr-1 text-gray-400" />
+                                                    {request.userName && !request.userName.includes('@') ? request.userName : (request.fullName || 'Unknown')}
+                                                </div>
+                                                <div className="flex items-center">
+                                                    <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                                                    {request.location || 'No location specified'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex flex-col sm:flex-row gap-2 md:ml-4">
+                                            <select
+                                                className={`text-sm border rounded-md p-1.5 ${getStatusColor(request.status)} border-transparent focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                                value={request.status}
+                                                onChange={(e) => handleMaintenanceStatusChange(request.id, e.target.value)}
+                                                disabled={actionLoading}
+                                                aria-label="Change status"
+                                            >
+                                                <option value="Pending">Pending</option>
+                                                <option value="In Progress">In Progress</option>
+                                                <option value="Completed">Completed</option>
+                                                <option value="Cancelled">Cancelled</option>
+                                            </select>
+                                            
+                                            <select
+                                                className={`text-sm border rounded-md p-1.5 ${getPriorityColor(request.priority)} border-transparent focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                                                value={request.priority}
+                                                onChange={(e) => handlePriorityChange(request.id, e.target.value)}
+                                                disabled={actionLoading}
+                                                aria-label="Change priority"
+                                            >
+                                                <option value="Unassigned">Unassigned</option>
+                                                <option value="Low Priority">Low Priority</option>
+                                                <option value="Medium Priority">Medium Priority</option>
+                                                <option value="High Priority">High Priority</option>
+                                                <option value="Emergency">Emergency</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    
+                                    {expandedRequests[request.id] && (
+                                        <div className="mt-4">
+                                            <div className="bg-gray-50 p-3 rounded-md mb-3">
+                                                <h4 className="font-medium text-sm text-gray-700 mb-1">Description:</h4>
+                                                <p className="text-gray-700 whitespace-pre-line">{request.description}</p>
+                                            </div>
+                                            
+                                            {/* Comments Section */}
+                                            <div className="mt-4">
+                                                <h4 className="font-medium text-sm text-gray-700 mb-2 flex items-center">
+                                                    <MessageSquare className="mr-1 h-4 w-4 text-gray-500" />
+                                                    Comments ({request.comments?.length || 0})
+                                                </h4>
+                                                
+                                                {request.comments && request.comments.length > 0 ? (
+                                                    <div className="space-y-2 max-h-64 overflow-y-auto p-1">
+                                                        {request.comments.map((comment, index) => (
+                                                            <div key={index} className={`p-3 rounded-lg ${comment.isAdminReply ? 'bg-blue-50 border-l-4 border-blue-400' : 'bg-gray-50'}`}>
+                                                                <p className="text-sm whitespace-pre-line">{comment.content}</p>
+                                                                <div className="flex items-center justify-between mt-1 text-xs text-gray-500">
+                                                                    <span className={`font-medium ${comment.isAdminReply ? 'text-blue-600' : 'text-gray-600'}`}>
+                                                                        {comment.isAdminReply ? 'Admin Reply' : 'User Comment'}
+                                                                    </span>
+                                                                    <span className="flex items-center">
+                                                                        <Clock className="h-3 w-3 mr-1" />
+                                                                        {comment.createdAt instanceof Date 
+                                                                            ? comment.createdAt.toLocaleString() 
+                                                                            : comment.createdAt?.toDate 
+                                                                                ? comment.createdAt.toDate().toLocaleString()
+                                                                                : 'Unknown date'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-sm text-gray-500 italic">No comments yet.</p>
+                                                )}
+                                                
+                                                {/* Reply Form */}
+                                                <div className="mt-3">
+                                                    {selectedRequest === request.id ? (
+                                                        <div>
+                                                            <div className="mb-2">
+                                                                <label htmlFor="quick-replies" className="block text-xs font-medium text-gray-700 mb-1">
+                                                                    Quick Replies:
+                                                                </label>
+                                                                <div className="flex flex-wrap gap-1">
+                                                                    {quickReplies.map((reply, index) => (
+                                                                        <button
+                                                                            key={index}
+                                                                            type="button"
+                                                                            onClick={() => useQuickReply(reply)}
+                                                                            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-2 py-1 rounded"
+                                                                        >
+                                                                            {reply.length > 30 ? reply.substring(0, 30) + '...' : reply}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <textarea
+                                                                className="w-full border rounded-md p-2 text-sm focus:ring-blue-500 focus:border-blue-500"
+                                                                placeholder="Write a reply to the user..."
+                                                                value={replyText}
+                                                                onChange={(e) => setReplyText(e.target.value)}
+                                                                rows="3"
+                                                            />
+                                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                                <button
+                                                                    className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 transition-colors flex items-center"
+                                                                    onClick={() => handleMaintenanceReply(request.id, replyText)}
+                                                                    disabled={actionLoading || !replyText.trim()}
+                                                                >
+                                                                    {actionLoading ? (
+                                                                        <>
+                                                                            <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                                                            Sending...
+                                                                        </>
+                                                                    ) : (
+                                                                        'Send Reply'
+                                                                    )}
+                                                                </button>
+                                                                <button
+                                                                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-200 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                                                                    onClick={() => {
+                                                                        setSelectedRequest(null);
+                                                                        setReplyText('');
+                                                                    }}
+                                                                >
+                                                                    Cancel
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex gap-2">
+                                                            <button
+                                                                className="flex items-center bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md text-sm transition-colors"
+                                                                onClick={() => {
+                                                                    setSelectedRequest(request.id);
+                                                                    setReplyText('');
+                                                                }}
+                                                            >
+                                                                <MessageSquare className="h-4 w-4 mr-1" />
+                                                                Reply to User
+                                                            </button>
+                                                            
+                                                            {request.status !== 'Cancelled' && (
+                                                                <button
+                                                                    className="flex items-center bg-red-50 hover:bg-red-100 text-red-700 px-3 py-1.5 rounded-md text-sm transition-colors"
+                                                                    onClick={() => setRequestToDelete(request)}
+                                                                >
+                                                                    <Trash className="h-4 w-4 mr-1" />
+                                                                    Cancel Request
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white shadow rounded-lg p-8 text-center">
+                        <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+                            <Wrench className="h-full w-full" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">No maintenance requests found</h3>
+                        <p className="text-gray-500">
+                            {searchTerm || statusFilter !== 'All' || priorityFilter !== 'All' ? 
+                                'Try adjusting your filters or search terms' : 
+                                'No maintenance requests have been submitted yet'}
+                        </p>
+                        {(searchTerm || statusFilter !== 'All' || priorityFilter !== 'All') && (
+                            <button
+                                onClick={resetFilters}
+                                className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                                Reset Filters
+                            </button>
+                        )}
+                    </div>
+                )}
+            </div>
+            
+            {/* Confirmation Modal for Deleting/Cancelling Request */}
+            {requestToDelete && (
+                <div className="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                <div className="sm:flex sm:items-start">
+                                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                                        <AlertTriangle className="h-6 w-6 text-red-600" />
+                                    </div>
+                                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                        <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                                            Cancel Maintenance Request
+                                        </h3>
+                                        <div className="mt-2">
+                                            <p className="text-sm text-gray-500">
+                                                Are you sure you want to cancel the maintenance request "{requestToDelete.title}"? This action cannot be undone.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                <button 
+                                    type="button" 
+                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                                    onClick={() => handleDeleteRequest(requestToDelete.id)}
+                                    disabled={actionLoading}
+                                >
+                                    {actionLoading ? (
+                                        <>
+                                            <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                            Processing...
+                                        </>
+                                    ) : (
+                                        'Yes, Cancel Request'
+                                    )}
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                    onClick={() => setRequestToDelete(null)}
+                                    disabled={actionLoading}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
-
     );
 };
 
