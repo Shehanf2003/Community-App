@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getFirestore, collection, getDocs, doc, getDoc, updateDoc, addDoc, query, orderBy, serverTimestamp, where } from 'firebase/firestore';
-import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock } from 'lucide-react';
+import { Wrench, AlertTriangle, CheckCircle, MessageSquare, Search, Filter, Calendar, X, RefreshCw, UserCircle, MapPin, PenSquare, Trash, SlidersHorizontal, Clock, Image as ImageIcon } from 'lucide-react';
 import { getIdToken, getAuth } from 'firebase/auth';
 
 const MaintenanceRequests = ({ currentUser }) => {
@@ -582,6 +582,11 @@ const MaintenanceRequests = ({ currentUser }) => {
                                         <div className="flex-grow mb-2 md:mb-0">
                                             <div className="flex items-center">
                                                 <h3 className="font-semibold text-lg text-gray-900">{request.title}</h3>
+                                                {request.imageUrl && (
+                                                <span className="ml-2 flex items-center text-blue-600">
+                                                <ImageIcon className="h-4 w-4" />
+                                                </span>
+                                                )}                                                
                                                 <button
                                                     onClick={() => toggleRequestExpansion(request.id)}
                                                     className="ml-2 text-gray-400 hover:text-gray-600"
@@ -654,6 +659,21 @@ const MaintenanceRequests = ({ currentUser }) => {
                                                 <h4 className="font-medium text-sm text-gray-700 mb-1">Description:</h4>
                                                 <p className="text-gray-700 whitespace-pre-line">{request.description}</p>
                                             </div>
+                                            {/* Image Section - New */}
+                                            {request.imageUrl && (
+                                                <div className="mt-4">
+                                                    <h4 className="font-medium text-sm text-gray-700 mb-2 flex items-center">
+                                                        <ImageIcon className="mr-1 h-4 w-4 text-gray-500" />
+                                                        Attached Image
+                                                    </h4>
+                                                    <div className="max-w-md">
+                                                        <MaintenanceRequestImage 
+                                                            imageUrl={request.imageUrl} 
+                                                            altText={`Image for ${request.title}`} 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                             
                                             {/* Comments Section */}
                                             <div className="mt-4">
